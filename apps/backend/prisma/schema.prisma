@@ -1,0 +1,59 @@
+// docs/dbSchema.md と整合させること
+// https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum TransactionType {
+  income
+  expense
+}
+
+model User {
+  id        String    @id @default(cuid())
+  email     String    @unique
+  name      String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  transactions Transaction[]
+}
+
+model Category {
+  id        String          @id @default(cuid())
+  name      String
+  type      TransactionType
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+  deletedAt DateTime?
+
+  transactions Transaction[]
+}
+
+model Transaction {
+  id         String          @id @default(cuid())
+  userId     String
+  categoryId String
+  amount     Int
+  date       DateTime
+  memo       String?
+  type       TransactionType @default(expense)
+  isFixed    Boolean         @default(false)
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+  deletedAt  DateTime?
+
+  user     User     @relation(fields: [userId], references: [id])
+  category Category @relation(fields: [categoryId], references: [id])
+
+  @@index([userId])
+  @@index([categoryId])
+  @@index([date])
+}

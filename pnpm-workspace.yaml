@@ -5,3 +5,5 @@ packages:
 # postinstall などのビルドスクリプト実行を明示的に許可するパッケージ
 allowBuilds:
   "@nestjs/core": true
+  "@prisma/engines": true
+  "prisma": true

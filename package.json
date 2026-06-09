@@ -20,7 +20,10 @@
     "db:psql": "docker exec -it pickCashDb psql -U pick_cash_db_user -d pick_cash_db",
     "dev:backend": "pnpm --filter @pick-cash/backend dev",
     "build:backend": "pnpm --filter @pick-cash/backend build",
-    "start:backend": "pnpm --filter @pick-cash/backend start"
+    "start:backend": "pnpm --filter @pick-cash/backend start",
+    "db:migrate": "pnpm --filter @pick-cash/backend exec prisma migrate dev",
+    "db:generate": "pnpm --filter @pick-cash/backend exec prisma generate",
+    "db:studio": "pnpm --filter @pick-cash/backend exec prisma studio"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.16"
