@@ -13,7 +13,11 @@
     "lint": "biome lint .",
     "lint:fix": "biome lint --write .",
     "check": "biome check .",
-    "check:fix": "biome check --write ."
+    "check:fix": "biome check --write .",
+    "db:up": "docker compose up -d",
+    "db:down": "docker compose down",
+    "db:logs": "docker compose logs -f db",
+    "db:psql": "docker exec -it pickCashDb psql -U pick_cash_db_user -d pick_cash_db"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.16"
