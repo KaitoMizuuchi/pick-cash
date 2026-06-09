@@ -1,0 +1,11 @@
+{
+  "name": "pick-cash",
+  "version": "0.0.1",
+  "private": true,
+  "description": "個人の収支管理アプリ",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "packageManager": "pnpm@11.5.0",
+  "scripts": {}
+}
