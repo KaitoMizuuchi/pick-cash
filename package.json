@@ -17,7 +17,10 @@
     "db:up": "docker compose up -d",
     "db:down": "docker compose down",
     "db:logs": "docker compose logs -f db",
-    "db:psql": "docker exec -it pickCashDb psql -U pick_cash_db_user -d pick_cash_db"
+    "db:psql": "docker exec -it pickCashDb psql -U pick_cash_db_user -d pick_cash_db",
+    "dev:backend": "pnpm --filter @pick-cash/backend dev",
+    "build:backend": "pnpm --filter @pick-cash/backend build",
+    "start:backend": "pnpm --filter @pick-cash/backend start"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.16"
