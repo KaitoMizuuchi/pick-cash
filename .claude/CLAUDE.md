@@ -38,8 +38,9 @@ pick-cash/
 
 機能ごとにModuleを切り、配下に以下のレイヤーを置く。
 
-- **Controller**: HTTPエンドポイント。リクエスト/レスポンスの変換のみ。ビジネスロジックを書かない
-- **Service**: ビジネスロジック・Prisma経由のDB操作
+- **Controller**: HTTPエンドポイント。リクエスト/レスポンスの変換のみ。ビジネスロジック禁止
+- **Service**: ビジネスロジック。DB操作は直接Prismaを呼ばずRepositoryに委譲する
+- **Repository**: PrismaClient経由のDB操作を集約。論理削除フィルタ（`deletedAt IS NULL`）の強制もここで行う
 - **DTO**: リクエスト/レスポンスの型・Zodスキーマ
 - **Module**: 機能単位のDIコンテナ
 

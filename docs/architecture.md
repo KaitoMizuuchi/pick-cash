@@ -110,19 +110,35 @@ apps/backend/src/
    │  ├─ transactions.module.ts
    │  ├─ transactions.controller.ts
    │  ├─ transactions.service.ts
+   │  ├─ transactions.repository.ts
    │  └─ transactions.dto.ts
    └─ categories/
       ├─ categories.module.ts
       ├─ categories.controller.ts
-      └─ categories.service.ts
+      ├─ categories.service.ts
+      └─ categories.repository.ts
 ```
 
 レイヤー責務:
 
-- **Controller**: HTTPエンドポイントの定義、リクエスト/レスポンスの変換のみ
-- **Service**: ビジネスロジック、Prisma経由のDB操作
+- **Controller**: HTTPエンドポイントの定義、リクエスト/レスポンスの変換のみ。ビジネスロジック禁止
+- **Service**: ビジネスロジックを担う。DB操作は直接Prismaを呼ばずRepositoryに委譲する
+- **Repository**: PrismaClientを経由したDB操作を集約。論理削除フィルタ（`deletedAt IS NULL`）の強制もここで行う
 - **DTO**: リクエスト/レスポンスの型・Zodスキーマ
 - **Module**: 機能単位のDIコンテナ
+
+#### Repository層を入れる理由
+
+- Prismaは型安全だが、ServiceにPrismaを直接書くと「論理削除フィルタの付け忘れ」「複雑なクエリの散在」が起きやすい
+- Repositoryに集約することで、Serviceは「業務ロジックだけ」「DBの具体に依存しない」状態を保ちやすくなる
+- Repositoryをモックすればテストが軽くなる（Prismaを立ち上げずService単体テスト可能）
+
+#### Repositoryの実装方針
+
+- クラスベース（`@Injectable()`）で実装し、`PrismaService` をコンストラクタで注入
+- 取得系メソッドは原則 `deletedAt: null` でフィルタする
+- 削除メソッドは物理削除ではなく `deletedAt` に削除日時をセット
+- 共通の論理削除フィルタは、必要に応じてヘルパー関数または基底クラスで共通化する（最初は素直に各Repositoryで書いて、重複が出てから抽出）
 
 ### フロントエンド（Nuxt）
 
