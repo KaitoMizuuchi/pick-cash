@@ -15,7 +15,22 @@
 
 # フォルダ構成 / スタック / コマンド
 
-セットアップ後に追記する（package.json確定後）。
+## フォルダ構成
+
+```
+pick-cash/
+├─ apps/        ← frontend / backend を配置予定
+├─ packages/    ← shared を配置予定
+├─ docs/        ← 設計ドキュメント
+└─ .claude/
+```
+
+## スタック・コマンド
+
+依存パッケージとスクリプトは各 `package.json` を参照する。
+
+- ルート: `/package.json`
+- 各app/package: `apps/*/package.json` / `packages/*/package.json`
 
 # レイヤー構成
 
