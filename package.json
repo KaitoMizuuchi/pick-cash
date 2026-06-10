@@ -23,7 +23,8 @@
     "start:backend": "pnpm --filter @pick-cash/backend start",
     "db:migrate": "pnpm --filter @pick-cash/backend exec prisma migrate dev",
     "db:generate": "pnpm --filter @pick-cash/backend exec prisma generate",
-    "db:studio": "pnpm --filter @pick-cash/backend exec prisma studio"
+    "db:studio": "pnpm --filter @pick-cash/backend exec prisma studio",
+    "db:seed": "pnpm --filter @pick-cash/backend exec ts-node prisma/seed.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.16"
