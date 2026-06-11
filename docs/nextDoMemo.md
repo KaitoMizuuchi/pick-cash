@@ -16,15 +16,16 @@
 - backend初期化（NestJS）
 - Prisma導入 + スキーマ定義 + マイグレーション
 - seed投入（仮ユーザー / カテゴリマスタ）
+- nestjs-zod / zod 導入（ZodベースのDTO・バリデーション基盤）
 
 ---
 
-## STEP 1: nestjs-zod / Vitest 導入
+## STEP 1: Vitest 導入
 
-ゴール: バックエンドでZodバリデーションとVitestテストが動く状態。
+ゴール: バックエンドでVitestテストが動く状態。
 
-- [ ] nestjs-zod 導入（ZodSchemaをDTOとして扱える）
-- [ ] Vitest 導入（既存テストランナー無しなのでクリーンに）
+- [ ] Vitest と関連パッケージを導入（NestJSデフォルトのJestは使わずクリーンに）
+- [ ] `vitest.config.ts` を作成（NestJS の `paths` や `experimentalDecorators` を考慮）
 - [ ] 動作確認用の最小テスト1本書いて `pnpm test` が通る
 
 動作確認: `pnpm --filter @pick-cash/backend test` が成功。
