@@ -21,6 +21,7 @@
     "dev:backend": "pnpm --filter @pick-cash/backend dev",
     "build:backend": "pnpm --filter @pick-cash/backend build",
     "start:backend": "pnpm --filter @pick-cash/backend start",
+    "test:backend": "pnpm --filter @pick-cash/backend test",
     "db:migrate": "pnpm --filter @pick-cash/backend exec prisma migrate dev",
     "db:generate": "pnpm --filter @pick-cash/backend exec prisma generate",
     "db:studio": "pnpm --filter @pick-cash/backend exec prisma studio",

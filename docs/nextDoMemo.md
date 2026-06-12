@@ -17,22 +17,11 @@
 - Prisma導入 + スキーマ定義 + マイグレーション
 - seed投入（仮ユーザー / カテゴリマスタ）
 - nestjs-zod / zod 導入（ZodベースのDTO・バリデーション基盤）
+- Vitest 導入（unplugin-swc でデコレータメタデータ保持、`@nestjs/testing` 連携）
 
 ---
 
-## STEP 1: Vitest 導入
-
-ゴール: バックエンドでVitestテストが動く状態。
-
-- [ ] Vitest と関連パッケージを導入（NestJSデフォルトのJestは使わずクリーンに）
-- [ ] `vitest.config.ts` を作成（NestJS の `paths` や `experimentalDecorators` を考慮）
-- [ ] 動作確認用の最小テスト1本書いて `pnpm test` が通る
-
-動作確認: `pnpm --filter @pick-cash/backend test` が成功。
-
----
-
-## STEP 2: packages/shared セットアップ
+## STEP 1: packages/shared セットアップ
 
 ゴール: フロント/バックで共有するZodスキーマの置き場ができる。
 
@@ -44,7 +33,7 @@
 
 ---
 
-## STEP 3: 仮認証ミドルウェア + GlobalExceptionFilter
+## STEP 2: 仮認証ミドルウェア + GlobalExceptionFilter
 
 ゴール: リクエストに `userId` が注入され、例外が一元処理される。
 
@@ -56,7 +45,7 @@
 
 ---
 
-## STEP 4: Category API (GET)
+## STEP 3: Category API (GET)
 
 ゴール: `GET /categories` でカテゴリ一覧が取得できる。
 
@@ -69,7 +58,7 @@
 
 ---
 
-## STEP 5: Transaction API (CRUD・論理削除)
+## STEP 4: Transaction API (CRUD・論理削除)
 
 ゴール: Transactionの作成・取得・更新・削除（論理）がAPIで動く。
 
@@ -86,7 +75,7 @@
 
 ---
 
-## STEP 6: frontend (Nuxt) 初期化
+## STEP 5: frontend (Nuxt) 初期化
 
 ゴール: Nuxtが起動して `localhost:3000` でページ表示。
 
@@ -99,7 +88,7 @@
 
 ---
 
-## STEP 7: 一覧画面
+## STEP 6: 一覧画面
 
 ゴール: `GET /transactions` を叩いて一覧表示する画面ができる。
 
@@ -111,7 +100,7 @@
 
 ---
 
-## STEP 8: 登録モーダル
+## STEP 7: 登録モーダル
 
 ゴール: モーダルで新規取引を追加できる。
 
@@ -123,7 +112,7 @@
 
 ---
 
-## STEP 9: 編集モーダル + 削除
+## STEP 8: 編集モーダル + 削除
 
 ゴール: 既存取引の編集・削除ができる。
 
@@ -139,6 +128,6 @@
 
 各ステップ着手時に確認:
 
-- Prismaのソフトデリート: `$extends` で共通化するか、Repository層で都度書くか（STEP 5で判断）
-- frontendの状態管理: 最初はcomposablesだけ vs Piniaを最初から（STEP 7で判断）
+- Prismaのソフトデリート: `$extends` で共通化するか、Repository層で都度書くか（STEP 4で判断）
+- frontendの状態管理: 最初はcomposablesだけ vs Piniaを最初から（STEP 6で判断）
 - ポート: frontend=3000 / backend=3001 / db=5432（決定済み）
