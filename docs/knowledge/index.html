@@ -1,0 +1,853 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>pick-cash 学習ナレッジ</title>
+<style>
+  :root {
+    --bg: #0f1419;
+    --bg-elev: #1a2129;
+    --border: #2a3441;
+    --text: #d6deeb;
+    --text-dim: #8b9bae;
+    --accent: #7fdbca;
+    --accent-strong: #50c2a8;
+    --code-bg: #0a0e13;
+    --code-text: #f0f6fc;
+    --warn: #ffcb6b;
+    --good: #c3e88d;
+    --bad: #ff6b6b;
+    --link: #82aaff;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #fafbfc;
+      --bg-elev: #ffffff;
+      --border: #d1d9e0;
+      --text: #1f2328;
+      --text-dim: #59636e;
+      --accent: #0969da;
+      --accent-strong: #0550ae;
+      --code-bg: #f6f8fa;
+      --code-text: #1f2328;
+      --warn: #9a6700;
+      --good: #1a7f37;
+      --bad: #cf222e;
+      --link: #0969da;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, "Segoe UI", "Hiragino Sans", "Yu Gothic UI", sans-serif;
+    line-height: 1.7;
+  }
+  main {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 32px 24px 80px;
+  }
+  header.page-header {
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 16px;
+    margin-bottom: 32px;
+  }
+  header.page-header h1 {
+    margin: 0 0 8px;
+    font-size: 28px;
+  }
+  header.page-header p {
+    margin: 0;
+    color: var(--text-dim);
+    font-size: 14px;
+  }
+  nav.toc {
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin-bottom: 32px;
+  }
+  nav.toc h2 {
+    margin: 0 0 12px;
+    font-size: 16px;
+    color: var(--text-dim);
+  }
+  nav.toc ul {
+    margin: 0;
+    padding-left: 20px;
+  }
+  nav.toc a {
+    color: var(--link);
+    text-decoration: none;
+  }
+  nav.toc a:hover { text-decoration: underline; }
+  section.category {
+    margin-bottom: 40px;
+  }
+  section.category > h2 {
+    font-size: 22px;
+    border-left: 4px solid var(--accent);
+    padding-left: 12px;
+    margin: 32px 0 8px;
+  }
+  section.category > p.cat-desc {
+    color: var(--text-dim);
+    margin-top: 0;
+    margin-bottom: 20px;
+    font-size: 14px;
+  }
+  details.qa {
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-bottom: 12px;
+    overflow: hidden;
+    transition: border-color 0.15s;
+  }
+  details.qa[open] {
+    border-color: var(--accent);
+  }
+  details.qa > summary {
+    cursor: pointer;
+    padding: 14px 20px;
+    font-weight: 600;
+    user-select: none;
+    list-style: none;
+    position: relative;
+    padding-left: 44px;
+  }
+  details.qa > summary::-webkit-details-marker { display: none; }
+  details.qa > summary::before {
+    content: "Q.";
+    color: var(--accent-strong);
+    font-weight: 700;
+    position: absolute;
+    left: 20px;
+    top: 14px;
+  }
+  details.qa[open] > summary {
+    border-bottom: 1px solid var(--border);
+    background: var(--code-bg);
+  }
+  .qa-body {
+    padding: 18px 24px 22px;
+  }
+  .qa-body p { margin: 0.6em 0; }
+  .qa-body h4 {
+    margin: 1.4em 0 0.4em;
+    font-size: 15px;
+    color: var(--accent);
+  }
+  .qa-body h5 {
+    margin: 1.2em 0 0.3em;
+    font-size: 14px;
+    color: var(--text-dim);
+  }
+  .qa-body ul, .qa-body ol {
+    padding-left: 22px;
+    margin: 0.5em 0;
+  }
+  .qa-body li { margin: 0.25em 0; }
+  pre {
+    background: var(--code-bg);
+    color: var(--code-text);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px 14px;
+    overflow-x: auto;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+  code {
+    background: var(--code-bg);
+    color: var(--code-text);
+    padding: 2px 5px;
+    border-radius: 3px;
+    font-size: 0.92em;
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  }
+  pre code {
+    background: transparent;
+    padding: 0;
+    border-radius: 0;
+  }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 1em 0;
+    font-size: 14px;
+  }
+  th, td {
+    border: 1px solid var(--border);
+    padding: 8px 12px;
+    text-align: left;
+    vertical-align: top;
+  }
+  th {
+    background: var(--code-bg);
+    font-weight: 600;
+  }
+  .ascii-art {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px 16px;
+    font-family: "SFMono-Regular", Consolas, monospace;
+    font-size: 12.5px;
+    line-height: 1.4;
+    overflow-x: auto;
+    white-space: pre;
+    margin: 1em 0;
+  }
+  .note {
+    background: var(--code-bg);
+    border-left: 3px solid var(--accent);
+    padding: 10px 14px;
+    margin: 1em 0;
+    font-size: 13.5px;
+    color: var(--text-dim);
+  }
+  .note.warn {
+    border-left-color: var(--warn);
+  }
+  .badge {
+    display: inline-block;
+    background: var(--accent-strong);
+    color: var(--bg);
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
+    margin-left: 6px;
+    vertical-align: middle;
+  }
+  .badge.warn { background: var(--warn); color: var(--bg); }
+  .badge.bad { background: var(--bad); color: var(--bg); }
+  .badge.good { background: var(--good); color: var(--bg); }
+  hr {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 1.5em 0;
+  }
+  .check { color: var(--good); }
+  .cross { color: var(--bad); }
+</style>
+</head>
+<body>
+<main>
+  <header class="page-header">
+    <h1>pick-cash 学習ナレッジ</h1>
+    <p>NestJS / Nuxt 学習プロジェクトの中で出てきた疑問と解説。新しいトピックは追記していく。</p>
+  </header>
+
+  <nav class="toc">
+    <h2>目次</h2>
+    <ul>
+      <li><a href="#directory">ディレクトリ構成</a></li>
+      <li><a href="#decorators">@デコレータ</a></li>
+    </ul>
+  </nav>
+
+  <!-- ============================================ -->
+  <!-- カテゴリ: ディレクトリ構成 -->
+  <!-- ============================================ -->
+  <section class="category" id="directory">
+    <h2>ディレクトリ構成</h2>
+    <p class="cat-desc">NestJSの機能モジュールをどこに置くか、どう分けるか。</p>
+
+    <!-- Q1 -->
+    <details class="qa">
+      <summary>NestJSではどのようなディレクトリ構成パターンがある？</summary>
+      <div class="qa-body">
+        <p>NestJSコミュニティで見かける代表的なパターンは3つ。「公式の絶対ルール」は存在せず、規模・チームの好みで選ぶ。</p>
+
+        <h4>A. フラット派（公式CLIのデフォルト）</h4>
+        <p><code>nest g resource categories</code> を実行すると <code>src/categories/</code> 直下にフラットに作られる。</p>
+        <div class="ascii-art">src/
+├─ categories/
+│  ├─ categories.module.ts
+│  ├─ categories.controller.ts
+│  └─ ...
+├─ transactions/
+├─ users/
+├─ prisma/
+├─ common/
+└─ app.module.ts</div>
+        <ul>
+          <li><span class="check">○</span> 公式CLIをそのまま使える、階層が浅い</li>
+          <li><span class="cross">×</span> 機能が10〜20個に増えると <code>src/</code> 直下に機能・横断的処理・設定が混在してカオスになりがち</li>
+        </ul>
+
+        <h4>B. modules配下派<span class="badge">採用</span></h4>
+        <p>機能モジュールを <code>src/modules/</code> 配下にまとめ、横断的処理（common, prisma）と物理的に分離する。</p>
+        <div class="ascii-art">src/
+├─ modules/
+│  ├─ categories/
+│  └─ transactions/
+├─ common/
+├─ prisma/
+└─ app.module.ts</div>
+        <ul>
+          <li><span class="check">○</span> 「機能モジュール」と「横断的処理」が物理的に分離されてスッキリ</li>
+          <li><span class="check">○</span> 機能が増えても <code>modules/</code> に並ぶだけで <code>src/</code> 直下が荒れない</li>
+          <li><span class="cross">×</span> 階層が1つ深くなる、公式CLIだと <code>--path src/modules</code> 指定が必要</li>
+        </ul>
+
+        <h4>C. DDD（ドメイン駆動設計）</h4>
+        <p>「ドメイン（業務ルール）を中心に据える」設計思想を取り入れたパターン。後述の専用Q参照。</p>
+
+        <h4>業界での採用率（体感）</h4>
+        <table>
+          <thead><tr><th>パターン</th><th>採用率</th><th>適性規模</th></tr></thead>
+          <tbody>
+            <tr><td>A. フラット</td><td>多い（公式デフォルト）</td><td>小〜中規模</td></tr>
+            <tr><td>B. modules配下</td><td>そこそこ多い</td><td>中〜大規模、機能が増える前提</td></tr>
+            <tr><td>C. DDD</td><td>少ない</td><td>大規模・複雑ドメイン</td></tr>
+          </tbody>
+        </table>
+
+        <div class="note">
+          <strong>pick-cashの判断:</strong> 機能が Category / Transaction / 将来の Income / Report ... と増えていく前提なので <strong>B（modules配下派）</strong> を採用。今のうちに modules で分けておくと、後から物理的な引っ越しが不要になる。
+        </div>
+      </div>
+    </details>
+
+    <!-- Q2 -->
+    <details class="qa">
+      <summary>pick-cashの最終的なディレクトリ構成はどうなる？</summary>
+      <div class="qa-body">
+        <p><code>common/</code>（横断的）と <code>modules/</code>（縦割り）を分けた構成。各機能モジュールは「Controller / Service / Repository / DTO / Module」の5層で構成する。</p>
+
+        <div class="ascii-art">apps/backend/src/
+├─ common/                          ← 横断的関心事
+│  ├─ filters/
+│  │  ├─ globalException.filter.ts
+│  │  └─ globalException.filter.spec.ts
+│  └─ middlewares/
+│     ├─ auth.middleware.ts
+│     └─ auth.middleware.spec.ts
+├─ modules/                          ← 機能モジュールはここに集約
+│  └─ categories/
+│     ├─ categories.module.ts        ← DI設定
+│     ├─ categories.controller.ts    ← HTTPエンドポイント定義
+│     ├─ categories.service.ts       ← ビジネスロジック層
+│     ├─ categories.repository.ts    ← Prisma操作集約・論理削除フィルタ
+│     ├─ categories.service.spec.ts
+│     ├─ categories.repository.spec.ts
+│     └─ dto/
+│        └─ getCategories.dto.ts     ← クエリパラメータ用DTO
+├─ prisma/                           ← PrismaService
+├─ types/                            ← 型拡張（.d.ts）
+├─ generated/                        ← Prisma生成物
+├─ app.controller.ts
+├─ app.module.ts                     ← CategoriesModule の imports に追加
+└─ main.ts                           ← ZodValidationPipe をグローバル登録</div>
+
+        <h4>各ディレクトリの役割</h4>
+        <table>
+          <thead><tr><th>ディレクトリ</th><th>役割</th><th>入れるもの</th></tr></thead>
+          <tbody>
+            <tr><td><code>common/</code></td><td>アプリ全体に効く横断的処理</td><td>Filter / Middleware / Pipe / Guard</td></tr>
+            <tr><td><code>modules/</code></td><td>機能単位のモジュール</td><td>各機能のサブディレクトリ（categories, transactions, users…）</td></tr>
+            <tr><td><code>prisma/</code></td><td>DB接続</td><td>PrismaService</td></tr>
+            <tr><td><code>types/</code></td><td>型拡張</td><td><code>.d.ts</code> 系</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </details>
+
+    <!-- Q3 -->
+    <details class="qa">
+      <summary>各機能モジュール（5層）の役割と依存関係は？</summary>
+      <div class="qa-body">
+        <p>各機能モジュールは「Controller → Service → Repository → Prisma」と<strong>下層を呼び出す依存関係</strong>で構成される。各層が単一の役割を持つ。</p>
+
+        <h4>依存方向</h4>
+        <div class="ascii-art">HTTPリクエスト
+    ↓
+Controller    ← HTTPエンドポイント定義、リクエスト/レスポンス変換だけ
+    ↓ 依存
+Service       ← ビジネスロジック層
+    ↓ 依存
+Repository    ← Prismaへのアクセス集約、deletedAt IS NULL を強制
+    ↓ 依存
+PrismaClient</div>
+
+        <h4>各層の責務</h4>
+        <table>
+          <thead><tr><th>層</th><th>役割</th><th>NGなこと</th></tr></thead>
+          <tbody>
+            <tr><td>Controller</td><td>HTTPエンドポイント定義、リクエスト/レスポンス変換</td><td>ビジネスロジックを書く、Prismaを直接呼ぶ</td></tr>
+            <tr><td>Service</td><td>ビジネスロジック、複数Repositoryをまたいだ処理</td><td>Prismaを直接呼ぶ</td></tr>
+            <tr><td>Repository</td><td>Prisma操作の集約、論理削除フィルタの強制</td><td>HTTPの知識を持つ、ビジネスロジックを持つ</td></tr>
+            <tr><td>DTO</td><td>入出力の型と契約</td><td>ロジックを持つ</td></tr>
+            <tr><td>Module</td><td>DIの配線</td><td>ロジックを持つ</td></tr>
+          </tbody>
+        </table>
+
+        <h4>実装する順番</h4>
+        <p>2つの流派がある。</p>
+        <ol>
+          <li><strong>トップダウン</strong>: Controller → Service → Repository（APIの形から逆算）</li>
+          <li><strong>ボトムアップ</strong>: Repository → Service → Controller（下層から積み上げる）<span class="badge good">推奨</span></li>
+        </ol>
+        <p>ボトムアップの方が、書いてる途中に型補完が効くので推奨。pick-cashでは <code>DTO → Repository → Service → Controller → Module → AppModule</code> の順で書く。</p>
+
+        <div class="note">
+          DTOを先に書くのは、入出力の「型契約」を最初に決められるから。<code>transactionTypeSchema</code> のような shared 部品を使い回せる。
+        </div>
+      </div>
+    </details>
+
+    <!-- Q4 -->
+    <details class="qa">
+      <summary>DDDパターンを採用するとどんな構成になる？</summary>
+      <div class="qa-body">
+        <p>DDD（Domain-Driven Design）は「ドメイン（業務ルール）を中心に据える」設計思想。4つのレイヤーで構成する。</p>
+
+        <h4>DDDの4レイヤー</h4>
+        <div class="ascii-art">┌────────────────────────────────┐
+│ Presentation（外との接点）      │ ← Controller、リクエスト/レスポンス変換
+├────────────────────────────────┤
+│ Application（ユースケース）     │ ← Service的役割、トランザクション境界
+├────────────────────────────────┤
+│ Domain（業務ルール）            │ ← エンティティ、値オブジェクト、Repositoryの契約
+├────────────────────────────────┤
+│ Infrastructure（外部依存実装）  │ ← Repository実装、Prisma、外部API
+└────────────────────────────────┘
+   ↑ 依存方向（外側→内側のみ）</div>
+
+        <p>ポイント: Domain層は <strong>外部（Prisma等）に依存しない</strong>。Repository は Domain では <strong>interface だけ</strong>定義して、実装は Infrastructure に置く（<strong>依存性逆転</strong>）。</p>
+
+        <h4>スタイル1: レイヤー先頭（水平分割）</h4>
+        <p>レイヤーを <code>src/</code> 直下に並べる。</p>
+        <div class="ascii-art">src/
+├─ presentation/
+│  └─ categories/
+│     ├─ categories.controller.ts
+│     └─ dto/getCategories.dto.ts
+├─ application/
+│  └─ categories/
+│     └─ getCategoriesUsecase.ts
+├─ domain/
+│  └─ categories/
+│     ├─ category.entity.ts
+│     ├─ transactionType.vo.ts             ← 値オブジェクト
+│     └─ categoryRepository.interface.ts   ← Repository契約
+└─ infrastructure/
+   └─ categories/
+      └─ prismaCategoryRepository.ts       ← Repository実装</div>
+
+        <h4>スタイル2: コンテキスト先頭（垂直分割）</h4>
+        <p>機能（境界づけられたコンテキスト）を先頭に置いて、その下にレイヤー。</p>
+        <div class="ascii-art">src/
+└─ contexts/
+   ├─ categories/
+   │  ├─ presentation/
+   │  ├─ application/
+   │  ├─ domain/
+   │  ├─ infrastructure/
+   │  └─ categories.module.ts
+   └─ transactions/
+      ├─ presentation/
+      ├─ application/
+      ├─ domain/
+      ├─ infrastructure/
+      └─ transactions.module.ts</div>
+
+        <h4>コード例（スタイル1）</h4>
+<pre><code>// domain/categories/categoryRepository.interface.ts
+export interface CategoryRepository {
+  findAll(type?: TransactionType): Promise&lt;Category[]&gt;;
+}
+
+// infrastructure/categories/prismaCategoryRepository.ts
+@Injectable()
+export class PrismaCategoryRepository implements CategoryRepository {
+  constructor(private prisma: PrismaService) {}
+  async findAll(type?: TransactionType): Promise&lt;Category[]&gt; { ... }
+}
+
+// application/categories/getCategoriesUsecase.ts
+@Injectable()
+export class GetCategoriesUsecase {
+  constructor(
+    @Inject('CategoryRepository') private repo: CategoryRepository
+  ) {}
+  async execute(type?: TransactionType) { return this.repo.findAll(type); }
+}</code></pre>
+
+        <h4>どちらが「DDDらしい」？</h4>
+        <p><strong>スタイル2（コンテキスト先頭）</strong>の方がDDDの「境界づけられたコンテキスト」という概念に近い。書籍『実践ドメイン駆動設計』（IDDD）でもこちらが推奨。NestJSの <code>@Module()</code> がそのまま境界づけられたコンテキストになるので相性が良い。</p>
+
+        <h4>pick-cashにDDDを採用しなかった理由</h4>
+        <table>
+          <thead><tr><th></th><th>今回のpick-cash</th><th>DDDが効くプロジェクト</th></tr></thead>
+          <tbody>
+            <tr><td>ドメインの複雑さ</td><td>単純（取引のCRUD）</td><td>業務ルールが複雑（医療・金融・物流）</td></tr>
+            <tr><td>規模</td><td>個人開発・小〜中規模</td><td>大規模・複数チーム</td></tr>
+            <tr><td>長期保守</td><td>学習プロジェクト</td><td>数年〜10年単位</td></tr>
+          </tbody>
+        </table>
+        <p>DDDの interface分離、依存性逆転、値オブジェクト あたりは、業務ルールが薄いプロジェクトに入れると「コードは増えるけど価値は出ない」ことが多い。学習目的で <strong>「将来やるかもしれないからイメージは持っとく」</strong> のはアリ。</p>
+      </div>
+    </details>
+  </section>
+
+  <!-- ============================================ -->
+  <!-- カテゴリ: @デコレータ -->
+  <!-- ============================================ -->
+  <section class="category" id="decorators">
+    <h2>@デコレータ</h2>
+    <p class="cat-desc">NestJSがクラス・メソッドに「メタデータをくっつける」仕組み。NestJS理解の核。</p>
+
+    <!-- Q1 -->
+    <details class="qa">
+      <summary>そもそも@デコレータって何？何のためにある？</summary>
+      <div class="qa-body">
+        <p>NestJSのデコレータは <strong>「クラスやメソッドに『メタデータ』をくっつける」</strong> 仕組み。NestJSがクラスを見たときに、デコレータを読んで「あ、これはこういう用途なのね」と理解する。</p>
+
+        <h4>デコレータが付いてないクラス vs 付いてるクラス</h4>
+<pre><code>// ただのクラス。NestJSは何も特別扱いしない
+class Foo {}
+
+// @Module() が付いた瞬間、NestJSは「これはModuleだ」と認識する
+@Module({})
+class Bar {}</code></pre>
+
+        <h4>デコレータの主な役割</h4>
+        <table>
+          <thead><tr><th>役割</th><th>例</th></tr></thead>
+          <tbody>
+            <tr><td>クラスの種別を宣言</td><td><code>@Module()</code>, <code>@Controller()</code>, <code>@Injectable()</code></td></tr>
+            <tr><td>HTTPメソッドとパスを紐付け</td><td><code>@Get()</code>, <code>@Post()</code>, <code>@Patch()</code></td></tr>
+            <tr><td>リクエストの要素を取り出す</td><td><code>@Body()</code>, <code>@Query()</code>, <code>@Param()</code></td></tr>
+            <tr><td>横断的処理を適用</td><td><code>@UseGuards()</code>, <code>@UseFilters()</code>, <code>@UsePipes()</code></td></tr>
+            <tr><td>例外の対象を指定</td><td><code>@Catch()</code></td></tr>
+          </tbody>
+        </table>
+
+        <div class="note">
+          <strong>イメージ:</strong> デコレータは「クラスに貼る付箋」みたいなもの。NestJSが起動時にクラスを見て、付箋を読んで「Moduleとして登録するぞ」「Controllerとして扱うぞ」と判断する。
+        </div>
+      </div>
+    </details>
+
+    <!-- Q2 -->
+    <details class="qa">
+      <summary>クラスレベルのデコレータ（@Module / @Injectable / @Controller / @Catch）の違いは？</summary>
+      <div class="qa-body">
+        <p>「このクラスは何者か」を宣言する系のデコレータ。種類ごとに役割が違う。</p>
+
+        <h4>@Module()</h4>
+        <p>「このクラスは <strong>DIコンテナに登録するモジュールの単位</strong> です」と宣言。<code>imports</code> / <code>providers</code> / <code>controllers</code> / <code>exports</code> を引数で渡す。</p>
+<pre><code>@Module({
+  imports: [PrismaModule],
+  controllers: [CategoriesController],
+  providers: [CategoriesService, CategoriesRepository],
+})
+export class CategoriesModule {}</code></pre>
+
+        <h4>@Injectable()</h4>
+        <p>「このクラスは <strong>DIコンテナの管理対象</strong> です」と宣言。Service / Repository / Guard / Interceptor / Pipe / Middleware など、<strong>DIで他クラスから注入される側</strong>のクラスにつける。</p>
+<pre><code>@Injectable()
+export class CategoriesService {
+  constructor(private readonly repo: CategoriesRepository) {}
+  //                  ↑ DIコンテナが自動で渡してくれる
+}</code></pre>
+
+        <h4>@Controller()</h4>
+        <p>「このクラスは <strong>HTTPエンドポイントを担当するController</strong> です」と宣言。引数でルートプレフィックスを指定。</p>
+<pre><code>@Controller('categories')   // ← /categories がルートプレフィックス
+export class CategoriesController {
+  @Get()                    // ← GET /categories
+  async list() { ... }
+
+  @Get(':id')               // ← GET /categories/:id
+  async detail() { ... }
+}</code></pre>
+
+        <h4>@Catch()</h4>
+        <p>「このクラスは <strong>ExceptionFilter</strong> で、<strong>これこれの例外を担当します</strong>」と宣言。</p>
+<pre><code>@Catch()                              // 引数なし: 全例外を担当
+@Catch(HttpException)                 // 引数あり: HttpExceptionとその子孫だけ
+@Catch(HttpException, ZodValidationException)   // 複数指定もOK</code></pre>
+        <p><code>@Catch()</code> が付いてないクラスは、<code>useGlobalFilters()</code> に渡しても ExceptionFilter として認識されない。</p>
+
+        <h4>使い分けの表</h4>
+        <table>
+          <thead><tr><th>デコレータ</th><th>付けるクラス</th><th>意味</th></tr></thead>
+          <tbody>
+            <tr><td><code>@Module()</code></td><td>機能の束ね役クラス</td><td>DIコンテナに登録する単位</td></tr>
+            <tr><td><code>@Injectable()</code></td><td>Service, Repository, Middleware, Guard, Interceptor, Pipe</td><td>DI管理対象</td></tr>
+            <tr><td><code>@Controller()</code></td><td>Controller</td><td>HTTPエンドポイント担当</td></tr>
+            <tr><td><code>@Catch()</code></td><td>ExceptionFilter</td><td>例外捕捉担当、対象例外を指定</td></tr>
+          </tbody>
+        </table>
+
+        <div class="note">
+          <code>@Injectable()</code> は<strong>広い概念</strong>（DI管理対象なら何でも）。<code>@Controller()</code> や <code>@Catch()</code> は<strong>狭い具体的な役割</strong>を宣言する。
+        </div>
+      </div>
+    </details>
+
+    <!-- Q3 -->
+    <details class="qa">
+      <summary>メソッドレベルのデコレータ（@Get / @Post / @Body / @Query）は何をしている？</summary>
+      <div class="qa-body">
+        <p>Controllerの <strong>各メソッドにHTTPメソッドとパスを紐付けたり、リクエストから値を取り出したり</strong> するためのデコレータ。</p>
+
+        <h4>HTTPメソッド系</h4>
+<pre><code>@Controller('categories')
+export class CategoriesController {
+  @Get()           // GET /categories
+  list() {}
+
+  @Get(':id')      // GET /categories/:id
+  detail() {}
+
+  @Post()          // POST /categories
+  create() {}
+
+  @Patch(':id')    // PATCH /categories/:id
+  update() {}
+
+  @Delete(':id')   // DELETE /categories/:id
+  remove() {}
+}</code></pre>
+
+        <h4>リクエスト要素を取り出す系</h4>
+        <table>
+          <thead><tr><th>デコレータ</th><th>取り出すもの</th><th>使用例</th></tr></thead>
+          <tbody>
+            <tr><td><code>@Body()</code></td><td>リクエストボディ全体</td><td><code>POST /categories</code> のJSON</td></tr>
+            <tr><td><code>@Query()</code></td><td>クエリパラメータ全体</td><td><code>?type=expense</code></td></tr>
+            <tr><td><code>@Param()</code></td><td>URLパスパラメータ</td><td><code>/categories/:id</code> の id</td></tr>
+            <tr><td><code>@Req()</code></td><td>Expressのreq全体</td><td><code>req.userId</code> など</td></tr>
+            <tr><td><code>@Res()</code></td><td>Expressのres全体</td><td>通常使わない（NestJSの自動整形が無効になる）</td></tr>
+          </tbody>
+        </table>
+
+<pre><code>@Get(':id')
+async detail(
+  @Param('id') id: string,            // /categories/:id の id だけ取り出す
+  @Query() query: GetQueryDto,        // クエリ全体をDTOで受ける
+  @Body() body: CreateBodyDto,        // ボディ全体をDTOで受ける
+  @Req() req: Request,                // Expressのreqを直接触る
+) {
+  return { userId: req.userId, id };  // AuthMiddlewareが入れたuserIdが取れる
+}</code></pre>
+
+        <div class="note">
+          <code>@Body()</code> / <code>@Query()</code> / <code>@Param()</code> にDTO型を組み合わせると、<strong>自動でバリデーションが走る</strong>（ZodValidationPipeが効いている場合）。
+        </div>
+      </div>
+    </details>
+
+    <!-- Q4 -->
+    <details class="qa">
+      <summary>横断的処理を適用するデコレータ（@UseGuards / @UseFilters / @UsePipes / @UseInterceptors）は？</summary>
+      <div class="qa-body">
+        <p>NestJSには「横断的関心事」を扱う仕組みが4種類ある。それぞれ Guard / Filter / Pipe / Interceptor と呼ばれ、<code>@UseXxx()</code> デコレータで特定のController/メソッドに適用できる。</p>
+
+        <h4>4種類の役割</h4>
+        <table>
+          <thead><tr><th>種類</th><th>役割</th><th>適用デコレータ</th></tr></thead>
+          <tbody>
+            <tr><td>Guard</td><td>認可。リクエストを通すか拒否するか判定</td><td><code>@UseGuards()</code></td></tr>
+            <tr><td>Interceptor</td><td>前後処理（ロギング、キャッシュ、レスポンス変換）</td><td><code>@UseInterceptors()</code></td></tr>
+            <tr><td>Pipe</td><td>入力の変換・バリデーション</td><td><code>@UsePipes()</code></td></tr>
+            <tr><td>ExceptionFilter</td><td>例外処理</td><td><code>@UseFilters()</code></td></tr>
+          </tbody>
+        </table>
+
+        <h4>適用範囲の3パターン</h4>
+        <ol>
+          <li><strong>特定のメソッド/Controllerだけ</strong>: <code>@UseXxx()</code> をクラスやメソッドに付ける</li>
+          <li><strong>アプリ全体（main.ts）</strong>: <code>app.useGlobalXxx(new ...)</code></li>
+          <li><strong>アプリ全体（providers経由でDI使う）</strong>: <code>{ provide: APP_GUARD, useClass: ... }</code></li>
+        </ol>
+
+        <h4>例: 特定のメソッドだけ</h4>
+<pre><code>@Controller('transactions')
+@UseGuards(AuthGuard)                       // Controller全体に
+export class TransactionsController {
+  @Get(':id')
+  @UseInterceptors(LoggingInterceptor)      // このハンドラだけ
+  findOne(@Param('id', ParseIntPipe) id: number) { ... }
+  //                       ↑ パラメータレベルでPipe
+}</code></pre>
+
+        <h4>例: アプリ全体（main.ts）</h4>
+<pre><code>const app = await NestFactory.create(AppModule);
+app.useGlobalFilters(new GlobalExceptionFilter());
+app.useGlobalPipes(new ZodValidationPipe());</code></pre>
+
+        <h4>例: アプリ全体（DI効かせる場合）</h4>
+<pre><code>@Module({
+  providers: [
+    { provide: APP_GUARD, useClass: AuthGuard },
+    { provide: APP_FILTER, useClass: ExceptionFilter },
+  ],
+})
+export class AppModule {}</code></pre>
+        <p>Cの利点は <strong>DIコンテナ経由でインスタンス化されるので、他のService（PrismaServiceなど）を注入できる</strong>こと。Bは <code>new XxxFilter()</code> を自分でやるので、依存があると面倒。</p>
+      </div>
+    </details>
+
+    <!-- Q5 -->
+    <details class="qa">
+      <summary>Middlewareだけ@UseXxx()がないのはなぜ？</summary>
+      <div class="qa-body">
+        <p>NestJSの横断的処理 5種類のうち、<strong>Middlewareだけ</strong>登録方法が違う。<code>@UseMiddleware()</code> は存在せず、代わりに <strong><code>AppModule.configure()</code></strong> で登録する。</p>
+
+        <h4>Middlewareの登録方法</h4>
+<pre><code>@Module({...})
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer): void {
+    consumer.apply(AuthMiddleware).forRoutes('*');
+  }
+}</code></pre>
+
+        <h4>なぜMiddlewareだけ特別？</h4>
+        <p>MiddlewareはExpress（またはFastify）の <strong>生のreq/resを扱うレイヤー</strong>で、NestJSの抽象化（DIや<code>@UseXxx</code>の仕組み）より<strong>一段下のレイヤー</strong>に位置するから。だからNestJSは「configure() という専用フック」を Module に用意した。</p>
+
+        <h4>登録方法のまとめ</h4>
+        <table>
+          <thead><tr><th>種類</th><th>場所</th><th>理由</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Middleware</strong></td><td><code>AppModule.configure()</code></td><td>Expressレイヤーの特殊扱い</td></tr>
+            <tr><td>Guard / Interceptor / Pipe / Filter</td><td><code>main.ts</code> か <code>@UseXxx()</code> か <code>providers: [APP_*]</code></td><td>NestJSレイヤーで色々な粒度に適用したいから選択肢が多い</td></tr>
+          </tbody>
+        </table>
+
+        <h4>NestJSのリクエスト処理パイプライン</h4>
+        <div class="ascii-art">Request
+  ↓
+Middleware  ← AppModule.configure() で登録
+  ↓
+Guard       ← @UseGuards() / グローバル登録
+  ↓
+Interceptor ← @UseInterceptors() / グローバル登録
+  ↓
+Pipe        ← @UsePipes() / グローバル登録
+  ↓
+Controller  ← @Controller(), @Get() などで定義
+  ↓
+Service / Repository
+  ↓ 例外発生
+  ← ExceptionFilter ← @UseFilters() / グローバル登録</div>
+
+        <div class="note">
+          <strong>覚え方:</strong> 「Moduleクラスに <code>implements 何か</code> を付けてその中で前処理を書く」のは <strong>Middlewareだけの特殊パターン</strong>。
+        </div>
+      </div>
+    </details>
+
+    <!-- Q6 -->
+    <details class="qa">
+      <summary>@Module()の引数（imports / providers / controllers / exports）の意味は？</summary>
+      <div class="qa-body">
+        <p><code>@Module()</code> は4つの主要オプションを受け取る。NestJSのDI設定の中心。</p>
+
+        <h4>各オプションの役割</h4>
+        <table>
+          <thead><tr><th>キー</th><th>意味</th><th>何を入れる</th></tr></thead>
+          <tbody>
+            <tr><td><code>imports</code></td><td>他Moduleから借りてくる</td><td>他のModuleクラス</td></tr>
+            <tr><td><code>controllers</code></td><td>このModuleが持つController</td><td>Controllerクラス</td></tr>
+            <tr><td><code>providers</code></td><td>このModuleで生成・管理するクラス</td><td>Service / Repository など</td></tr>
+            <tr><td><code>exports</code></td><td>他Moduleにも公開するクラス</td><td>provider群の一部</td></tr>
+          </tbody>
+        </table>
+
+        <h4>使用例</h4>
+<pre><code>// PrismaModule: PrismaServiceを他Moduleで使えるようexportする
+@Module({
+  providers: [PrismaService],
+  exports: [PrismaService],   // ← exportしないと他Moduleから使えない
+})
+export class PrismaModule {}
+
+// CategoriesModule: PrismaModuleからPrismaServiceを借りる
+@Module({
+  imports: [PrismaModule],    // ← importすればPrismaServiceが使える
+  controllers: [CategoriesController],
+  providers: [CategoriesService, CategoriesRepository],
+})
+export class CategoriesModule {}</code></pre>
+
+        <h4>DIコンテナの仕組み</h4>
+        <p>これらを <code>@Module({...})</code> で宣言することで、NestJSの<strong>DIコンテナに「何を登録するか」を伝える</strong>。</p>
+        <div class="ascii-art">NestJSアプリ
+└─ DIコンテナ（NestJSが裏で持つ「箱」）
+   ├─ AppModule
+   │   ├─ AppController
+   │   └─ AuthMiddleware
+   └─ PrismaModule
+       └─ PrismaService</div>
+
+        <div class="note">
+          <strong>AppModule ≠ DIコンテナ。</strong> AppModuleは「DIコンテナに何を登録するかをまとめた設計図」みたいなもの。コンテナ本体はNestJSの内部にある。
+        </div>
+      </div>
+    </details>
+
+    <!-- Q7 -->
+    <details class="qa">
+      <summary>implementsとデコレータはどう違う？両方ついてるクラスがあるけど…</summary>
+      <div class="qa-body">
+        <p>2つは<strong>全く別の役割</strong>を持つ。デコレータは「メタデータ付与」、implementsは「型契約の宣言」。両方付くケースは普通にある。</p>
+
+        <h4>例: AuthMiddleware</h4>
+<pre><code>@Injectable()                                      // ← デコレータ
+export class AuthMiddleware implements NestMiddleware {  // ← implements
+  use(req, res, next) { ... }
+}</code></pre>
+
+        <table>
+          <thead><tr><th></th><th><code>@Injectable()</code>（デコレータ）</th><th><code>implements NestMiddleware</code></th></tr></thead>
+          <tbody>
+            <tr><td>役割</td><td>NestJSに「DI管理対象」とメタデータ付与</td><td>「<code>use</code> メソッドを持つ契約」をTypeScriptに宣言</td></tr>
+            <tr><td>影響範囲</td><td>ランタイム（NestJS）</td><td>コンパイル時（TypeScript）</td></tr>
+            <tr><td>なくしたら？</td><td>NestJSがDI管理してくれない</td><td>型エラーが消えるが、書き間違い検知ができなくなる</td></tr>
+          </tbody>
+        </table>
+
+        <h4>implementsとextendsの違い</h4>
+        <table>
+          <thead><tr><th></th><th>extends（継承）</th><th>implements（契約）</th></tr></thead>
+          <tbody>
+            <tr><td>意味</td><td>親から実装を引き継ぐ</td><td>形だけ満たすことを約束</td></tr>
+            <tr><td>実装は？</td><td>親から自動で引き継ぐ</td><td>自分で全部書く</td></tr>
+            <tr><td>多重指定</td><td>1個だけ</td><td>複数OK（<code>implements A, B, C</code>）</td></tr>
+            <tr><td>用途</td><td>コード再利用</td><td>「この形を保証」</td></tr>
+          </tbody>
+        </table>
+
+        <h4>3者が組み合わさった例</h4>
+<pre><code>@Injectable()
+export class PrismaService
+  extends PrismaClient                    // ← PrismaClientを継承（実装も引き継ぐ）
+  implements OnModuleInit, OnModuleDestroy {  // ← 2つの契約を満たす
+}</code></pre>
+        <ul>
+          <li><code>@Injectable()</code>: 「DI管理対象」</li>
+          <li><code>extends PrismaClient</code>: PrismaClientの機能を継承</li>
+          <li><code>implements OnModuleInit, OnModuleDestroy</code>: ライフサイクルフックの契約を満たす</li>
+        </ul>
+
+        <div class="note">
+          <strong>覚え方:</strong> デコレータは「NestJSへの付箋」、implementsは「TypeScriptへの宣言」、extendsは「親の実装をもらう」。<strong>影響するレイヤーが違う</strong>のがポイント。
+        </div>
+      </div>
+    </details>
+  </section>
+</main>
+</body>
+</html>
