@@ -1,10 +1,11 @@
 import { type MiddlewareConsumer, Module, type NestModule } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AuthMiddleware } from './common/middlewares/auth.middleware';
+import { CategoriesModule } from './modules/categories/categories.module';
 import { PrismaModule } from './prisma/prisma.module';
 
 @Module({
-  imports: [PrismaModule],
+  imports: [PrismaModule, CategoriesModule],
   controllers: [AppController],
 })
 // NestModule を implements することで、NestJSが起動時に configure() を呼んでMiddleware設定を読み込む。
