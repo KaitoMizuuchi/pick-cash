@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { transactionTypeSchema } from "./category";
+import { transactionTypeSchema } from "./category.ts";
 
 export const transactionSchema = z.object({
   id: z.string(),
