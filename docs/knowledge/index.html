@@ -250,6 +250,9 @@
     <ul>
       <li><a href="#directory">ディレクトリ構成</a></li>
       <li><a href="#decorators">@デコレータ</a></li>
+      <li><a href="#internals">NestJSの内部の仕組み</a></li>
+      <li><a href="#api-implementation">API実装の進め方</a></li>
+      <li><a href="#env-pitfalls">環境構築ハマりポイント</a></li>
     </ul>
   </nav>
 
@@ -844,6 +847,699 @@ export class PrismaService
 
         <div class="note">
           <strong>覚え方:</strong> デコレータは「NestJSへの付箋」、implementsは「TypeScriptへの宣言」、extendsは「親の実装をもらう」。<strong>影響するレイヤーが違う</strong>のがポイント。
+        </div>
+      </div>
+    </details>
+
+    <!-- Q8 -->
+    <details class="qa">
+      <summary><code>constructor(private readonly service: CategoriesService) {}</code> の構造を分解すると？</summary>
+      <div class="qa-body">
+        <p>NestJSのServiceやControllerでよく出てくるこの書き方は、TypeScriptの <strong>「コンストラクタパラメータプロパティ」</strong> という省略記法。3つの要素に分解できる。</p>
+
+        <h4>3つの要素</h4>
+        <table>
+          <thead><tr><th>要素</th><th>意味</th></tr></thead>
+          <tbody>
+            <tr><td><code>private readonly</code></td><td>コンストラクタパラメータプロパティ。クラスフィールド宣言と <code>this.xxx = xxx</code> 代入を同時にやる省略記法</td></tr>
+            <tr><td><code>service</code></td><td>変数名（クラスフィールド名）。<code>this.service</code> でアクセスする</td></tr>
+            <tr><td><code>: CategoriesService</code></td><td>型注釈。ただの型ではなく <strong>DIキー</strong> として使われる</td></tr>
+          </tbody>
+        </table>
+
+        <h4>省略しない書き方 vs 省略形</h4>
+<pre><code>// 省略しない書き方（普通のTypeScript）
+@Injectable()
+export class CategoriesController {
+  private readonly service: CategoriesService;
+
+  constructor(service: CategoriesService) {
+    this.service = service;
+  }
+}
+
+// 省略形（コンストラクタパラメータプロパティ）
+@Injectable()
+export class CategoriesController {
+  constructor(private readonly service: CategoriesService) {}
+  //          ↑ フィールド宣言 + this代入が自動化される
+}</code></pre>
+
+        <h4><code>: CategoriesService</code> はただの型ではなくDIキー</h4>
+        <p>TypeScriptの型は通常コンパイル後に消えるが、tsconfig で <code>emitDecoratorMetadata: true</code> を有効にすると、<strong>デコレータが付いたクラスの引数型情報だけランタイムに残る</strong>。NestJSはこの型情報を <code>reflect-metadata</code> で読み取り、「この引数には CategoriesService のインスタンスを渡せばいい」と判断する。</p>
+
+        <h5>コンパイル後の擬似コード</h5>
+<pre><code>// 書いたコード
+@Injectable()
+class Foo {
+  constructor(private service: CategoriesService) {}
+}
+
+// コンパイル後（概念）
+Reflect.defineMetadata('design:paramtypes', [CategoriesService], Foo);
+//                                          ↑ ここに型情報が残る</code></pre>
+
+        <p>NestJSは起動時に各クラスに対して <code>Reflect.getMetadata('design:paramtypes', クラス)</code> を呼んで、必要な依存クラスを把握 → DIコンテナから取り出して注入する、という流れになる。</p>
+
+        <h4>tsconfig の有無で何が変わる？</h4>
+        <table>
+          <thead><tr><th>項目</th><th>OFFのとき</th><th>ONのとき</th></tr></thead>
+          <tbody>
+            <tr><td>書き方</td><td>同じ</td><td>同じ</td></tr>
+            <tr><td>型情報の寿命</td><td>コンパイル時に消える</td><td>ランタイムに残る</td></tr>
+            <tr><td>DI</td><td>動かない（NestJSが型を読めない）</td><td>動く</td></tr>
+          </tbody>
+        </table>
+
+        <div class="note warn">
+          <strong>注意:</strong> NestJSのDIを成立させるには tsconfig に <code>experimentalDecorators: true</code> と <code>emitDecoratorMetadata: true</code> の <strong>両方</strong> が必要。<code>@nestjs/cli</code> で初期化するとデフォルトで入っている。
+        </div>
+      </div>
+    </details>
+
+    <!-- Q9 -->
+    <details class="qa">
+      <summary><code>@Get()</code> に対応する <code>list</code> メソッドは誰が呼んでる？</summary>
+      <div class="qa-body">
+        <p>ユーザーが書いたコード上では <code>list()</code> はどこからも呼ばれていない。<strong>NestJSが起動時にExpressへルートを登録し、HTTPリクエスト時にExpress経由で呼び出される</strong>。</p>
+
+        <h4>メソッド名は自由</h4>
+<pre><code>@Controller('categories')
+export class CategoriesController {
+  @Get()  list() {}        // OK
+  @Get()  findAll() {}     // OK
+  @Get()  hogeFuga() {}    // OK（動く）
+}</code></pre>
+        <p>ルーティングを決めているのは <strong>デコレータ</strong>。メソッド名は人間が読むためだけのもの。</p>
+
+        <h4>NestJSが起動時にやっていること（擬似コード）</h4>
+<pre><code>for (const controller of allControllers) {
+  const prefix = Reflect.getMetadata('path', controller);
+  for (const method of methods(controller)) {
+    const httpMethod = Reflect.getMetadata('method', method);
+    expressApp[httpMethod](`/${prefix}/...`, async (req, res) =&gt; {
+      const instance = diContainer.get(controller);
+      const result = await instance[methodName](...);
+      res.json(result);
+    });
+  }
+}</code></pre>
+        <p>つまり起動時に「URLとメソッドの紐付け」をExpressに全部教え込んでいる。</p>
+
+        <h4>HTTPリクエスト時の流れ</h4>
+        <div class="ascii-art">クライアント
+   │  GET /categories
+   ▼
+Express （NestJSが裏で立てているHTTPサーバ）
+   │  起動時に登録されたルートにマッチ
+   ▼
+NestJSのルーティング層
+   │  DIコンテナからCategoriesControllerを取り出す
+   ▼
+controller.list()  ← ここで初めて呼ばれる
+   │
+   ▼
+Service → Repository → Prisma</div>
+
+        <h4>HonoとNestJSの違い</h4>
+        <table>
+          <thead><tr><th></th><th>Hono</th><th>NestJS</th></tr></thead>
+          <tbody>
+            <tr><td>ルート登録</td><td>自分で <code>app.get('/categories', handler)</code> と書く</td><td>デコレータ <code>@Get()</code> を貼るとフレームワークが裏で登録</td></tr>
+            <tr><td>関数の呼び出し元</td><td>自分が紐付けたhandlerが呼ばれる</td><td>NestJSが自動で対象メソッドを呼ぶ</td></tr>
+            <tr><td>スタイル</td><td>明示的（書いた通りに動く）</td><td>規約型（デコレータの意味を知っている前提）</td></tr>
+          </tbody>
+        </table>
+
+        <div class="note">
+          <strong>覚え方:</strong> Honoは「自分で配線する」、NestJSは「フレームワークが配線を読み取る」。NestJSは規約と引き換えに記述量が減る代わりに、<strong>「なぜ動くのか」が裏側にある</strong>。
+        </div>
+      </div>
+    </details>
+
+    <!-- Q10 -->
+    <details class="qa">
+      <summary><code>@Controller('categories')</code> の引数の意味は？</summary>
+      <div class="qa-body">
+        <p><code>@Controller()</code> の引数は <strong>ルートのプレフィックス</strong>。そのControllerに属するすべてのメソッドのパスの先頭につく。<code>@Get()</code> / <code>@Post()</code> などの引数と組み合わせて最終パスが決まる。</p>
+
+        <h4>組み合わせ例</h4>
+<pre><code>@Controller('categories')
+export class CategoriesController {
+  @Get()             // → GET    /categories
+  list() {}
+
+  @Get(':id')        // → GET    /categories/:id
+  detail() {}
+
+  @Post()            // → POST   /categories
+  create() {}
+
+  @Patch(':id')      // → PATCH  /categories/:id
+  update() {}
+}</code></pre>
+
+        <h4>プレフィックスを変えるとどうなる？</h4>
+<pre><code>@Controller('api/v1/categories')
+export class CategoriesController {
+  @Get()             // → GET /api/v1/categories
+  @Get(':id')        // → GET /api/v1/categories/:id
+}</code></pre>
+
+        <div class="note">
+          <strong>覚え方:</strong> 最終パス ＝ <code>@Controller(プレフィックス)</code> + <code>@Get(サブパス)</code>。プレフィックスを変えるだけで一括して全エンドポイントのパスを差し替えられる。
+        </div>
+      </div>
+    </details>
+
+    <!-- Q11 -->
+    <details class="qa">
+      <summary><code>@Module()</code> の providers と imports と <code>@Global()</code> の関係は？</summary>
+      <div class="qa-body">
+        <p>3つはすべて「DI（依存性注入）で何が使えるか」をコントロールする仕組み。それぞれ違うレイヤーで効く。</p>
+
+        <h4>3つの違い</h4>
+        <table>
+          <thead><tr><th>要素</th><th>役割</th></tr></thead>
+          <tbody>
+            <tr><td><code>providers</code></td><td>そのModule内でDI可能なクラスを登録する。同Module内のクラス同士は自由に注入し合える</td></tr>
+            <tr><td><code>imports</code></td><td>他Moduleが <code>exports</code> しているproviderを借りる。importしないと外のproviderは注入できない</td></tr>
+            <tr><td><code>exports</code></td><td>他Moduleから借りられるように公開する。<code>providers</code> に登録したクラスを <code>exports</code> にも書く必要がある</td></tr>
+            <tr><td><code>@Global()</code></td><td>そのModuleの <code>exports</code> を <strong>アプリ全体で利用可能にする</strong>。importsへの記述が不要になる</td></tr>
+          </tbody>
+        </table>
+
+        <h4>providers の意味（同Module内で相互注入）</h4>
+<pre><code>@Module({
+  providers: [CategoriesService, CategoriesRepository],
+})
+export class CategoriesModule {}
+
+// CategoriesService は CategoriesRepository を注入できる
+// （同じModuleの providers に並んでいるので）
+@Injectable()
+export class CategoriesService {
+  constructor(private readonly repo: CategoriesRepository) {}
+}</code></pre>
+
+        <h4>imports + exports の関係</h4>
+<pre><code>// 公開側: exports しないと外から使えない
+@Module({
+  providers: [PrismaService],
+  exports: [PrismaService],   // ← これがないと借りられない
+})
+export class PrismaModule {}
+
+// 借りる側: imports に書く
+@Module({
+  imports: [PrismaModule],    // ← これで PrismaService が注入可能に
+  providers: [CategoriesService],
+})
+export class CategoriesModule {}</code></pre>
+
+        <h4><code>@Global()</code> を付けた場合</h4>
+<pre><code>@Global()                       // ← これを付けると…
+@Module({
+  providers: [PrismaService],
+  exports: [PrismaService],
+})
+export class PrismaModule {}
+
+// 他Moduleでは imports に PrismaModule を書かなくてOK
+@Module({
+  providers: [CategoriesService, CategoriesRepository],
+  // imports: [PrismaModule] ← 不要！
+})
+export class CategoriesModule {}</code></pre>
+        <p>pick-cashでは <code>PrismaModule</code> が <code>@Global()</code> なので、各機能Moduleで <code>imports: [PrismaModule]</code> を書かなくても <code>PrismaService</code> が注入できる。</p>
+
+        <h4>4要素の比較表</h4>
+        <table>
+          <thead><tr><th></th><th>providers</th><th>imports</th><th>exports</th><th>@Global()</th></tr></thead>
+          <tbody>
+            <tr><td>何のため</td><td>自Module内で使える</td><td>他Moduleのを借りる</td><td>他Moduleに貸す</td><td>貸出先を「全Module」に拡張</td></tr>
+            <tr><td>書く場所</td><td><code>@Module({...})</code></td><td><code>@Module({...})</code></td><td><code>@Module({...})</code></td><td>クラスの上</td></tr>
+            <tr><td>これだけ使う？</td><td>必須</td><td>必要なときだけ</td><td>外に貸す場合のみ</td><td>頻繁に使われるModule（Prisma, Configなど）に限定</td></tr>
+          </tbody>
+        </table>
+
+        <div class="note warn">
+          <strong>注意:</strong> <code>@Global()</code> を乱用すると依存関係が不透明になる。「全Moduleが使うことが明らかなもの（DB接続、設定）」だけに限定するのが定石。
+        </div>
+      </div>
+    </details>
+  </section>
+
+  <!-- ============================================ -->
+  <!-- カテゴリ: NestJSの内部の仕組み -->
+  <!-- ============================================ -->
+  <section class="category" id="internals">
+    <h2>NestJSの内部の仕組み</h2>
+    <p class="cat-desc">NestJSがどうやってDI・ルーティング・バリデーションを成立させているか、その裏側。</p>
+
+    <!-- Q1 -->
+    <details class="qa">
+      <summary>DIコンテナってどんな仕組み？</summary>
+      <div class="qa-body">
+        <p>DIコンテナは <strong>「型をキーにインスタンスを保管する箱」</strong> というメンタルモデルで理解するのが一番早い。NestJSが起動時にこの箱を組み立てて、必要な場所にインスタンスを渡してくれる。</p>
+
+        <h4>DIコンテナの中身（概念図）</h4>
+        <div class="ascii-art">┌─────────────────────────────────────┐
+│  DIコンテナ                          │
+│  ┌─────────────────────────────┐    │
+│  │ Key: CategoriesService       │    │
+│  │ Value: 起動時生成のインスタンス  │    │
+│  └─────────────────────────────┘    │
+│  ┌─────────────────────────────┐    │
+│  │ Key: CategoriesRepository    │    │
+│  │ Value: インスタンス          │    │
+│  └─────────────────────────────┘    │
+│  ┌─────────────────────────────┐    │
+│  │ Key: PrismaService           │    │
+│  │ Value: インスタンス          │    │
+│  └─────────────────────────────┘    │
+└─────────────────────────────────────┘</div>
+
+        <h4>「型 = 住所」「import vs 型注釈」の役割分離</h4>
+        <p>importしているからDIされる…のではない。importとDIは <strong>役割が完全に分かれている</strong>。</p>
+        <table>
+          <thead><tr><th></th><th>import文</th><th>型注釈（<code>: CategoriesService</code>）</th></tr></thead>
+          <tbody>
+            <tr><td>誰が使う</td><td>TypeScript（コンパイラ）</td><td>NestJS（DIコンテナ）</td></tr>
+            <tr><td>役割</td><td>「このシンボルどこにある？」の解決</td><td>「DIコンテナのどのキーを引くか」のキー指定</td></tr>
+            <tr><td>消えるタイミング</td><td>コンパイル後にrequireに変換</td><td>通常は消えるが <code>emitDecoratorMetadata</code> でランタイムに残る</td></tr>
+          </tbody>
+        </table>
+
+        <p>つまり、ファイルパスやimport文はTypeScriptに「シンボルの場所」を教えるためのもので、DIコンテナはそれを <strong>気にしない</strong>。DIコンテナは「型」だけを見てインスタンスを引っ張ってくる。</p>
+
+        <h4>デフォルトはシングルトン</h4>
+        <p>NestJSのDIは <strong>起動時に1回だけインスタンスを生成し、使い回す</strong>のがデフォルト。100リクエスト来ても同じ <code>CategoriesService</code> インスタンスが使われる。<code>scope: Scope.REQUEST</code> を指定するとリクエストごとに生成されるが、特別な事情がない限り使わない。</p>
+
+        <div class="note">
+          <strong>覚え方:</strong> 「DIコンテナはMap&lt;型, インスタンス&gt;」。起動時にこのMapを組み立てて、コンストラクタの型を見て該当インスタンスを取り出して渡す。これがNestJSのDIの本体。
+        </div>
+      </div>
+    </details>
+
+    <!-- Q2 -->
+    <details class="qa">
+      <summary>interfaceでDIしたい場合の特別な書き方は？</summary>
+      <div class="qa-body">
+        <p>通常の <code>constructor(private repo: CategoryRepository) {}</code> は <strong>クラス型でしか動かない</strong>。interface型でDIしたい場合は <code>@Inject('TOKEN')</code> でトークンを明示する必要がある。</p>
+
+        <h4>なぜinterfaceは普通に書けないのか</h4>
+        <p>interfaceは <strong>コンパイル時に消える</strong>。<code>emitDecoratorMetadata</code> でメタデータを残しても、interfaceは「型情報」として存在しないため、Reflectで取り出すと <code>Object</code> になってしまう。NestJSは「Object型？知らないキーだな」となってDIに失敗する。</p>
+
+        <h4>コード例</h4>
+<pre><code>// ❌ 動かない（interfaceはランタイムに型情報が残らない）
+@Injectable()
+export class GetCategoriesUsecase {
+  constructor(private readonly repo: CategoryRepository) {}
+  //                                ↑ コンパイル後は Object になる
+}
+
+// ✅ @Inject() でトークンを明示
+@Injectable()
+export class GetCategoriesUsecase {
+  constructor(
+    @Inject('CategoryRepository') private readonly repo: CategoryRepository
+  ) {}
+}
+
+// providers 側でも文字列トークンで紐付け
+@Module({
+  providers: [
+    { provide: 'CategoryRepository', useClass: PrismaCategoryRepository },
+  ],
+})
+export class CategoriesModule {}</code></pre>
+
+        <h4>いつ出てくるか</h4>
+        <ul>
+          <li>DDDで Repository を interface で分離する場合</li>
+          <li>テスト用にモックと本番実装を切り替えるアーキテクチャ</li>
+          <li>外部API クライアントを抽象化する場合</li>
+        </ul>
+
+        <div class="note">
+          <strong>pick-cashでは登場しない:</strong> Repositoryはinterface分離せず具体クラスを直接注入する設計。よってこの <code>@Inject()</code> パターンは出てこない。<strong>「DDDをやるなら必須の書き方」</strong>として覚えておくレベルでOK。
+        </div>
+      </div>
+    </details>
+
+    <!-- Q3 -->
+    <details class="qa">
+      <summary>リクエストが届いてからControllerメソッドが呼ばれるまでの全体像は？</summary>
+      <div class="qa-body">
+        <p>NestJSの処理パイプラインは <strong>Middleware → Guard → Interceptor → Pipe → Controller → Service → Repository</strong>。例外が出たらExceptionFilterに合流する。</p>
+
+        <h4>リクエスト処理パイプライン</h4>
+        <div class="ascii-art">Request
+  ↓
+Middleware       ← AuthMiddleware で req.userId をセット
+  ↓
+Guard            ← 認可チェック（pick-cashでは未使用）
+  ↓
+Interceptor      ← 前後処理（ロギング等。pick-cashでは未使用）
+  ↓
+Pipe             ← ZodValidationPipe がDTOを検証
+  ↓
+Controller       ← @Get() で紐付いたメソッドが呼ばれる
+  ↓
+Service          ← ビジネスロジック
+  ↓
+Repository       ← Prismaを叩く
+  ↓
+DB
+
+[例外が出たら]
+  ← GlobalExceptionFilter に合流、ステータスコードとメッセージを整形して返す</div>
+
+        <h4>ZodValidationPipeが効く位置</h4>
+        <p>Pipeレイヤーは「Controller直前」。<code>@Body() dto: CreateCategoryDto</code> のような書き方をすると、Pipeが <strong>DTOに紐付いたZodスキーマで検証 → 失敗ならZodValidationException</strong>。検証が通った値だけControllerに渡る。</p>
+
+        <h4>起動時 vs リクエスト時 の対比</h4>
+        <table>
+          <thead><tr><th></th><th>起動時に1回だけ</th><th>リクエストのたびに毎回</th></tr></thead>
+          <tbody>
+            <tr><td>1</td><td>tsconfigの <code>emitDecoratorMetadata</code> で生成されたメタデータを <code>reflect-metadata</code> 経由で読む</td><td>Express がリクエストを受ける</td></tr>
+            <tr><td>2</td><td>DIコンテナにシングルトンを生成・登録</td><td>Middleware → Guard → Interceptor → Pipeの順で実行</td></tr>
+            <tr><td>3</td><td>Expressに全ルートを登録</td><td>DIコンテナからController取り出し → メソッド実行</td></tr>
+            <tr><td>4</td><td>Middlewareを <code>AppModule.configure()</code> で登録</td><td>例外発生時は ExceptionFilter へ</td></tr>
+          </tbody>
+        </table>
+
+        <div class="note">
+          <strong>覚え方:</strong> 起動時にやることは「メタデータ読込 + DIコンテナ構築 + ルート登録」。リクエスト時は「パイプラインを順に通すだけ」。<strong>重い仕事は起動時に終わっている</strong>のがNestJSの設計思想。
+        </div>
+      </div>
+    </details>
+  </section>
+
+  <!-- ============================================ -->
+  <!-- カテゴリ: API実装の進め方 -->
+  <!-- ============================================ -->
+  <section class="category" id="api-implementation">
+    <h2>API実装の進め方</h2>
+    <p class="cat-desc">機能モジュール（Category APIなど）を実装する際の標準的なフローと各層の責務。</p>
+
+    <!-- Q1 -->
+    <details class="qa">
+      <summary>機能APIを実装するときのレイヤー構成と書く順番は？</summary>
+      <div class="qa-body">
+        <p>機能APIは <strong>Controller → Service → Repository → Prisma</strong> の依存方向で構成。書く順番は <strong>下層からのボトムアップ</strong> が推奨。</p>
+
+        <h4>依存方向</h4>
+        <div class="ascii-art">Controller    ← HTTPの入口
+    ↓ 依存
+Service       ← ビジネスロジック
+    ↓ 依存
+Repository    ← Prismaへのアクセス集約
+    ↓ 依存
+PrismaClient  ← DB</div>
+
+        <h4>書く順番（ボトムアップ）</h4>
+        <ol>
+          <li><strong>DTO</strong>: 入出力の型契約を最初に決める</li>
+          <li><strong>Repository</strong>: Prismaを叩く層</li>
+          <li><strong>Service</strong>: Repositoryを呼ぶビジネスロジック</li>
+          <li><strong>Controller</strong>: HTTPエンドポイントを定義してServiceを呼ぶ</li>
+          <li><strong>Module</strong>: providers / controllers でDI配線</li>
+          <li><strong>AppModule登録</strong>: imports に追加して有効化</li>
+        </ol>
+
+        <h4>なぜボトムアップ？</h4>
+        <p>下層から書く方が <strong>「使いたい関数がすでに存在している状態」で上層を書ける</strong>ので、IDEの型補完が効きやすい。逆のトップダウンだと、Controllerを書いてる時点で <code>this.service.list()</code> の戻り値型が未定で補完が利かず辛い。</p>
+
+        <h4>各層に書くこと（実装時の視点）</h4>
+        <table>
+          <thead><tr><th>層</th><th>具体的に書くもの</th></tr></thead>
+          <tbody>
+            <tr><td>DTO</td><td><code>createZodDto(getCategoriesQuerySchema)</code> を継承したクラス。Zodスキーマは shared に置く</td></tr>
+            <tr><td>Repository</td><td><code>findAll()</code> 等のメソッド。<code>where: { deletedAt: null }</code> の論理削除フィルタもここ</td></tr>
+            <tr><td>Service</td><td>Repositoryを呼ぶメソッド。複数Repositoryをまたぐ集約処理もここ</td></tr>
+            <tr><td>Controller</td><td><code>@Get()</code> 等のデコレータ + ServiceメソッドのIN/OUTを変換するだけ</td></tr>
+            <tr><td>Module</td><td><code>providers: [Service, Repository]</code>, <code>controllers: [Controller]</code></td></tr>
+          </tbody>
+        </table>
+
+        <h4>Category APIの例</h4>
+<pre><code>// 1. DTO（dto/getCategories.dto.ts）
+export class GetCategoriesQueryDto extends createZodDto(getCategoriesQuerySchema) {}
+
+// 2. Repository（categories.repository.ts）
+@Injectable()
+export class CategoriesRepository {
+  constructor(private readonly prisma: PrismaService) {}
+  async findAll(type?: TransactionType) {
+    return this.prisma.category.findMany({
+      where: { deletedAt: null, ...(type && { type }) },
+    });
+  }
+}
+
+// 3. Service（categories.service.ts）
+@Injectable()
+export class CategoriesService {
+  constructor(private readonly repo: CategoriesRepository) {}
+  list(type?: TransactionType) { return this.repo.findAll(type); }
+}
+
+// 4. Controller（categories.controller.ts）
+@Controller('categories')
+export class CategoriesController {
+  constructor(private readonly service: CategoriesService) {}
+  @Get()
+  list(@Query() query: GetCategoriesQueryDto) {
+    return this.service.list(query.type);
+  }
+}
+
+// 5. Module（categories.module.ts）
+@Module({
+  controllers: [CategoriesController],
+  providers: [CategoriesService, CategoriesRepository],
+})
+export class CategoriesModule {}
+
+// 6. AppModule に登録
+@Module({ imports: [CategoriesModule, ...] })
+export class AppModule {}</code></pre>
+
+        <div class="note">
+          <strong>覚え方:</strong> 「型契約を決める → 下から積む → 配線」。書き始める前にDTO（＝API契約）を決めると迷いが減る。
+        </div>
+      </div>
+    </details>
+
+    <!-- Q2 -->
+    <details class="qa">
+      <summary>DTO + createZodDto + nestjs-zod でバリデーションはどう動く？</summary>
+      <div class="qa-body">
+        <p>DTOクラスの正体は <strong>「Zodスキーマを抱えた箱」</strong>。<code>createZodDto()</code> がスキーマをクラスに包み、NestJSの <code>ZodValidationPipe</code> がそれを認識して自動でバリデーションする。</p>
+
+        <h4>仕組みの流れ</h4>
+        <div class="ascii-art">GetCategoriesQueryDto (クラス)
+  └─ createZodDto(getCategoriesQuerySchema) を継承
+       └─ 内部にZodスキーマを保持
+       └─ NestJSの ZodValidationPipe がこのクラスを認識
+       └─ @Query() で受け取る瞬間に検証実行
+       └─ 失敗 → ZodValidationException
+       └─ 成功 → 型付きの値が Controller に渡る</div>
+
+        <h4>コード例</h4>
+<pre><code>// packages/shared/src/schemas/category.ts
+export const getCategoriesQuerySchema = z.object({
+  type: transactionTypeSchema.optional(),
+});
+
+// apps/backend/src/modules/categories/dto/getCategories.dto.ts
+import { createZodDto } from 'nestjs-zod';
+import { getCategoriesQuerySchema } from '@pick-cash/shared/schemas/category.ts';
+
+export class GetCategoriesQueryDto extends createZodDto(getCategoriesQuerySchema) {}
+
+// apps/backend/src/main.ts
+async function bootstrap() {
+  const app = await NestFactory.create(AppModule);
+  app.useGlobalPipes(new ZodValidationPipe());  // ← 1行入れるだけで全エンドポイント自動検証
+  await app.listen(3000);
+}</code></pre>
+
+        <h4>失敗時のフロー</h4>
+        <p><code>?type=invalid</code> のような不正値が来たとき:</p>
+        <div class="ascii-art">クライアント: GET /categories?type=invalid
+  ↓
+ZodValidationPipe: schema.parse() → 失敗
+  ↓
+ZodValidationException がthrowされる
+  ↓
+GlobalExceptionFilter で捕捉
+  ↓
+レスポンス: { statusCode: 400, message: 'Bad Request' }
+  ↓
+詳細はサーバの console.error に出力（情報漏洩しない）</div>
+
+        <h4>main.ts 1行で全エンドポイントに効く理由</h4>
+        <p><code>useGlobalPipes()</code> はパイプラインの <strong>Pipeレイヤー全体に1つのPipeを適用</strong> する。各Controllerメソッドの引数デコレータ（<code>@Body()</code>, <code>@Query()</code> など）が値を受け取る直前に必ず通る。よってDTOクラスを書いておくだけで自動的に検証が走る。</p>
+
+        <div class="note">
+          <strong>覚え方:</strong> DTOは「箱」、Zodスキーマは「中身のルール」、ZodValidationPipeは「全エンドポイントに自動で適用される検査官」。3点セットで <strong>「リクエストが入る瞬間に必ず検査される」</strong>状態が作れる。
+        </div>
+      </div>
+    </details>
+  </section>
+
+  <!-- ============================================ -->
+  <!-- カテゴリ: 環境構築ハマりポイント -->
+  <!-- ============================================ -->
+  <section class="category" id="env-pitfalls">
+    <h2>環境構築ハマりポイント</h2>
+    <p class="cat-desc">Node・TypeScript・モノレポで実際に遭遇したハマりとその回避方法。</p>
+
+    <!-- Q1 -->
+    <details class="qa">
+      <summary>ESM と CJS の共存について（NestJS + pnpm workspace 構成）</summary>
+      <div class="qa-body">
+        <p>pick-cashは <strong>「ソース上はESM風、コンパイル後はCJS、共有パッケージはESM風TS」</strong>という3層キメラ状態。これがハマりの根本原因になる。</p>
+
+        <h4>前提: ESM vs CJS</h4>
+        <table>
+          <thead><tr><th></th><th>CJS（CommonJS）</th><th>ESM（ES Modules）</th></tr></thead>
+          <tbody>
+            <tr><td>構文</td><td><code>const x = require('./foo')</code> / <code>module.exports = ...</code></td><td><code>import x from './foo'</code> / <code>export ...</code></td></tr>
+            <tr><td>拡張子の厳しさ</td><td>緩い（<code>./foo</code> で <code>foo.js</code> や <code>foo/index.js</code> を自動解決）</td><td>厳しい（<code>./foo.js</code> のように拡張子必須）</td></tr>
+            <tr><td>由来</td><td>Node.js が最初に採用したモジュール仕様</td><td>ECMAScript 標準のモジュール仕様</td></tr>
+            <tr><td>動的読込</td><td>同期</td><td>非同期（<code>import()</code>）</td></tr>
+          </tbody>
+        </table>
+
+        <h4>pick-cashの実態</h4>
+        <ul>
+          <li>ソースは全部 <code>import</code> / <code>export</code> 構文（ESM風の見た目）</li>
+          <li>backend の <code>tsconfig.json</code> が <code>"module": "commonjs"</code> なので、コンパイル後は <code>require</code> に変換される</li>
+          <li><code>packages/shared</code> はビルドしない（TSのまま読まれる）</li>
+          <li>結果、「backend(CJS) ↔ shared(ESM風TS)」の境界で変換が発生</li>
+        </ul>
+
+        <h4>なぜNestJSはCJSがデフォルトなのか</h4>
+        <ul>
+          <li><strong>reflect-metadata の依存</strong>: ESM環境で動かすには初期化順序の調整が必要</li>
+          <li><strong>DI初期化順序</strong>: ESMのトップレベルawaitと相性が悪い</li>
+          <li><strong>公式CLIテンプレ</strong>: <code>nest new</code> がCJSで作る</li>
+        </ul>
+        <p>近年は対応しつつあるが、現状のスムーズな解はCJSのまま。</p>
+
+        <h4>ビルド後の実物（概念）</h4>
+<pre><code>// 書いたコード（main.ts）
+import { NestFactory } from '@nestjs/core';
+import { AppModule } from './app.module';
+
+// コンパイル後（dist/main.js）
+"use strict";
+const core_1 = require("@nestjs/core");
+const app_module_1 = require("./app.module");</code></pre>
+
+        <h4>3層キメラの図</h4>
+        <div class="ascii-art">[ソース層]            backend/src/*.ts        ← ESM風 import/export
+                              ↓ tsc / swc
+[ビルド出力層]        backend/dist/*.js       ← CJS require
+                              ↓ require('@pick-cash/shared')
+[共有パッケージ層]    packages/shared/src/*.ts ← ESM風TS（ビルドしない）</div>
+
+        <div class="note warn">
+          <strong>ここがハマる:</strong> backendはCJSで動くが、共有パッケージはTSのまま読み込まれるためNodeのモジュール解決ルールが <strong>ESM寄り</strong>に切り替わるケースがある。次の Q を参照。
+        </div>
+      </div>
+    </details>
+
+    <!-- Q2 -->
+    <details class="qa">
+      <summary>Node v24 で shared パッケージから <code>ERR_MODULE_NOT_FOUND</code> が出る問題</summary>
+      <div class="qa-body">
+        <p>backendのビルドやテストでは出ないが、<strong>実機起動（<code>pnpm dev:backend</code>）でだけ</strong> shared 経由のimportが <code>ERR_MODULE_NOT_FOUND</code> で落ちる。</p>
+
+        <h4>原因</h4>
+        <p>Node v24 が <strong>CJSからTSをrequireする経路でESM resolverを動かす</strong>挙動になった。ESM resolverは拡張子必須なので、shared/index.ts内の <code>export * from './schemas/category'</code>（拡張子なし）が解決できずに落ちる。</p>
+
+        <h4>フロー図</h4>
+        <div class="ascii-art">[backend実行時]
+require('@pick-cash/shared')
+  → packages/shared/src/index.ts （ESM風TS）
+     ├─ export * from './schemas/category'      ← 拡張子なし
+     │    → Node v24 の ESM resolver が動く
+     │    → .ts 拡張子なし → ERR_MODULE_NOT_FOUND
+     │
+     └─ export * from './schemas/transaction'   ← 同じく失敗</div>
+
+        <h4>解決策3案</h4>
+        <table>
+          <thead><tr><th>案</th><th>内容</th><th>採用</th></tr></thead>
+          <tbody>
+            <tr><td>A</td><td>importに <code>.ts</code> 拡張子を明示<br><code>export * from './schemas/category.ts'</code></td><td><span class="badge good">採用</span></td></tr>
+            <tr><td>B</td><td>shared/package.json に <code>"type": "module"</code> を追加</td><td>影響範囲が大きい</td></tr>
+            <tr><td>C</td><td>sharedをビルドして <code>dist</code> 経由で配布</td><td>学習プロジェクトでは過剰</td></tr>
+          </tbody>
+        </table>
+
+        <h4>採用した解（A）</h4>
+<pre><code>// packages/shared/src/index.ts
+export * from './schemas/category.ts';     // ← .ts を付ける
+export * from './schemas/transaction.ts';</code></pre>
+
+        <h4>VSCodeのエラーは別問題</h4>
+        <p>上の対応をすると、VSCodeで <strong>「<code>allowImportingTsExtensions</code> が有効である場合〜」</strong>というエラーが出る。これはTypeScript本体（tsserver）が出しているエラーで、<strong>ビルド・実行には影響しない</strong>。詳細は次のQへ。</p>
+
+        <div class="note">
+          <strong>覚え方:</strong> 「ビルドは通るのに実行で落ちる」「テストは通るのに <code>pnpm dev</code> で落ちる」 → モジュール解決の経路差異を疑う。Node のバージョンとESM resolverの挙動を最初に確認。
+        </div>
+      </div>
+    </details>
+
+    <!-- Q3 -->
+    <details class="qa">
+      <summary><code>allowImportingTsExtensions</code> とは？いつ使う？</summary>
+      <div class="qa-body">
+        <p>TypeScriptのコンパイラオプション。<code>import './foo.ts'</code> のように <strong><code>.ts</code> 拡張子を含んだimportを許可する</strong>設定。デフォルトでは禁止されている。</p>
+
+        <h4>なぜデフォルトで禁止？</h4>
+        <p>TypeScriptの基本思想は「<code>.ts</code> はコンパイル後に消えるべき」。<code>foo.ts</code> をimportしても、コンパイル後の <code>foo.js</code> ではパスが噛み合わない。だからデフォルトでは <code>./foo</code> や <code>./foo.js</code> を書くのが正規ルート。</p>
+
+        <h4>経路ごとの挙動の違い</h4>
+        <table>
+          <thead><tr><th>経路</th><th>tsconfigを参照するか</th><th>.ts拡張子付きimportの扱い</th></tr></thead>
+          <tbody>
+            <tr><td>VSCode の tsserver</td><td>する（shared/tsconfig.json を厳格に適用）</td><td><code>allowImportingTsExtensions: false</code> ならエラー表示</td></tr>
+            <tr><td>backend ビルド（swc経由）</td><td>tsserverほど厳しくない</td><td>swcはts拡張子をエラー判定しない</td></tr>
+            <tr><td>Node ランタイム</td><td>無関係（tsconfigを読まない）</td><td>ファイルパスで解決できればOK</td></tr>
+          </tbody>
+        </table>
+
+        <h4>採用した設定</h4>
+<pre><code>// packages/shared/tsconfig.json
+{
+  "compilerOptions": {
+    "allowImportingTsExtensions": true,
+    "noEmit": true   // ← 必須セット
+  }
+}</code></pre>
+
+        <h4><code>noEmit: true</code> とセットなのはなぜ？</h4>
+        <p>TypeScriptの論理: 「<code>.ts</code> 付きでimportを書く＝コンパイル後のJSにそのまま出るとマズい → TypeScriptが出力しない（<code>noEmit</code>）なら矛盾しないからOK」。<strong>「TSがJSを吐かないなら、ソース上に.tsが残っていても問題ない」</strong>という論理。</p>
+
+        <div class="ascii-art">[許可される組み合わせ]
+allowImportingTsExtensions: true
+  ＋ noEmit: true                    ← セット必須
+  ＝ TSはJSを出力しない、ソースのまま使う
+
+[禁止される組み合わせ]
+allowImportingTsExtensions: true
+  ＋ noEmit: false                   ← エラー
+  ＝ JSを吐くのに.ts付きimportが残るので破綻</div>
+
+        <div class="note">
+          <strong>pick-cashでの位置づけ:</strong> sharedパッケージは「ビルドせずTSのまま使う」方針なので <code>noEmit: true</code>。よって <code>allowImportingTsExtensions: true</code> も付けられる。これで Node v24 の ESM resolver の拡張子必須要求も満たせる、というのが <strong>3層キメラ問題の最終解</strong>。
         </div>
       </div>
     </details>
