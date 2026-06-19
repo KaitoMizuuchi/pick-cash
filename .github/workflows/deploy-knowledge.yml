@@ -1,0 +1,49 @@
+# docs/knowledge/ 配下の学習ナレッジHTMLを GitHub Pages にデプロイする。
+# docs/ 全体ではなく knowledge/ のみを公開ルートにすることで、
+# requirements.md など他のドキュメントを公開せずに済む。
+name: Deploy knowledge to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+    # knowledge配下に変更があった時だけデプロイ。コード変更で毎回走らないよう絞る。
+    paths:
+      - 'docs/knowledge/**'
+      - '.github/workflows/deploy-knowledge.yml'
+  # 手動デプロイも可能にする（Settings → Actions → Run workflow ボタン）
+  workflow_dispatch:
+
+# GitHub Pages デプロイに必要な権限。
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# 同時に複数のデプロイが走らないようにする。後発が優先される動作で問題ない。
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      # docs/knowledge/ の中身だけを公開対象としてアップロード。
+      # path 指定によりこのディレクトリが Pages のルートに展開される。
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs/knowledge
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
