@@ -1,2 +1,2 @@
-export * from "./schemas/category.ts";
-export * from "./schemas/transaction.ts";
+export * from "./schemas/category";
+export * from "./schemas/transaction";
