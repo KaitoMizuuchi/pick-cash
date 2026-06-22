@@ -81,6 +81,21 @@ Biomeで自動整形・チェックする項目（インデント・クォート
 - 同じコードが3箇所に出てきたら共通化を検討する（Rule of Three）。2回目までは許容
 - "便利関数" を即 `utils` に投げる前に本当に汎用かを判断する。特定ドメインのものは該当機能のディレクトリに置く
 
+## CRUDメソッド命名規約（バックエンド）
+
+Controller / Service / Repository の全層で同じメソッド名を使う（NestJS公式CLIテンプレと同じ流儀）。層が変わってもgrep一発で追える状態を保ち、層の責務はファイル位置で表現する。
+
+| 操作 | メソッド名 | HTTP |
+|---|---|---|
+| 一覧取得 | `findAll` | GET / |
+| 詳細取得 | `findOne` | GET /:id |
+| 作成 | `create` | POST / |
+| 更新 | `update` | PATCH /:id |
+| 削除（論理削除含む） | `remove` | DELETE /:id |
+
+- 派生メソッド（特殊な検索など）は動詞始まり + 内容で命名（例: `findByUserId`, `findActiveBetween`）
+- ビジネスロジック起点のメソッドは業務語彙で命名（例: `register`, `calculateMonthlyTotal`）。CRUDの基本動詞と混同しないこと
+
 ## エラーハンドリング
 
 ### バックエンド

@@ -14,7 +14,7 @@ describe('CategoriesService', () => {
     vi.mocked(repository.findAll).mockResolvedValue([]);
     const service = new CategoriesService(repository);
 
-    await service.getAll('income');
+    await service.findAll('income');
 
     expect(repository.findAll).toHaveBeenCalledWith('income');
   });
@@ -24,7 +24,7 @@ describe('CategoriesService', () => {
     vi.mocked(repository.findAll).mockResolvedValue([]);
     const service = new CategoriesService(repository);
 
-    await service.getAll();
+    await service.findAll();
 
     expect(repository.findAll).toHaveBeenCalledWith(undefined);
   });
@@ -37,7 +37,7 @@ describe('CategoriesService', () => {
     );
     const service = new CategoriesService(repository);
 
-    const result = await service.getAll();
+    const result = await service.findAll();
 
     expect(result).toBe(fixture);
   });

@@ -5,11 +5,11 @@ import { TransactionsRepository } from "./transactions.repository";
 export class TransactionsService {
   constructor(private readonly repository: TransactionsRepository) {}
 
-  async getAll() {
+  async findAll() {
     return this.repository.findAll();
   }
 
-  async getFindOne(id: string) {
+  async findOne(id: string) {
     return this.repository.findOne(id);
   }
 }

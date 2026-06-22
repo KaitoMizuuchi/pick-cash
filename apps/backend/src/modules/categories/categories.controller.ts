@@ -12,8 +12,8 @@ export class CategoriesController {
   // - レスポンスは API 仕様（docs/apiEndpoints.md）の { data: [...] } 形式に整形する。
   //   この「レスポンス形」への詰め替えは Controller の責務に閉じる。
   @Get()
-  async list(@Query() query: GetCategoriesQueryDto) {
-    const data = await this.service.getAll(query.type);
+  async findAll(@Query() query: GetCategoriesQueryDto) {
+    const data = await this.service.findAll(query.type);
     return { data };
   }
 }

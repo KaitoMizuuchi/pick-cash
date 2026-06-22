@@ -6,13 +6,13 @@ export class TransactionsController {
   constructor(private readonly service: TransactionsService) {}
 
   @Get()
-  async list() {
-    const data = await this.service.getAll();
+  async findAll() {
+    const data = await this.service.findAll();
     return { data };
   }
 
   @Get(":id")
   async findOne(@Param("id") id: string) {
-    return this.service.getFindOne(id);
+    return this.service.findOne(id);
   }
 }

@@ -10,7 +10,7 @@ export class CategoriesService {
   // 現時点ではビジネスロジックは無く Repository への素通し。
   // Controller が直接 Repository を呼ばない構造を維持しておくことで、将来「並び順をユーザー設定で
   // 変える」「使用回数の多い順に並べる」等のロジックが追加されたとき Service 内に閉じ込められる。
-  async getAll(type?: TransactionType): Promise<Category[]> {
+  async findAll(type?: TransactionType): Promise<Category[]> {
     return this.repository.findAll(type);
   }
 }
