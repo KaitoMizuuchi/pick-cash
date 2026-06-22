@@ -8,4 +8,8 @@ export class TransactionsService {
   async getAll() {
     return this.repository.findAll();
   }
+
+  async getFindOne(id: string) {
+    return this.repository.findOne(id);
+  }
 }
