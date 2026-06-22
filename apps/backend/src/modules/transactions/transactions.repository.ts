@@ -1,6 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service";
 import { Prisma } from "../../generated/prisma/client";
+import { CreateTransactionInput } from "@pick-cash/shared";
 
 // カテゴリーとユーザーはともにnameだけ返す。idはmapのkeyで使用する。
 const transactionSelect = {
@@ -47,6 +48,17 @@ export class TransactionsRepository {
   async findOne(id: string) {
     return this.prisma.transaction.findUnique({
       where: { id, deletedAt: null },
+
+      select: transactionSelect,
+    });
+  }
+
+  async create(userId: string, data: CreateTransactionInput) {
+    return this.prisma.transaction.create({
+      data: {
+        userId: userId,
+        ...data,
+      },
 
       select: transactionSelect,
     });
