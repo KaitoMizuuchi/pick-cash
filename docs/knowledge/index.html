@@ -1543,6 +1543,257 @@ allowImportingTsExtensions: true
         </div>
       </div>
     </details>
+
+    <!-- Q4 -->
+    <details class="qa">
+      <summary>TypeScript の moduleResolution 戦略の選び方（"node" は非推奨）</summary>
+      <div class="qa-body">
+        <p>shared をビルド方式に転換するときに <code>moduleResolution: "node"</code> を指定したら、TypeScript 7.0 で廃止になるという警告が出た。選択肢を整理する。</p>
+
+        <h4>moduleResolution の選択肢一覧</h4>
+        <table>
+          <thead><tr><th>値</th><th>用途</th><th>特徴</th></tr></thead>
+          <tbody>
+            <tr><td><code>classic</code></td><td>TS初期の名残</td><td>もう使わない、ほぼ廃止</td></tr>
+            <tr><td><code>node</code>（= <code>node10</code>）</td><td>古い Node.js (v11以前) 風</td><td><strong>TS非推奨、TS7で消える</strong></td></tr>
+            <tr><td><code>node16</code></td><td>Node.js v16+ の ESM対応</td><td>中庸、現代Nodeに合う</td></tr>
+            <tr><td><code>nodenext</code></td><td>最新Node対応</td><td>一番モダン</td></tr>
+            <tr><td><code>bundler</code></td><td>Webpack/Vite等のバンドラ前提</td><td>フロント寄り</td></tr>
+          </tbody>
+        </table>
+
+        <h4><code>node</code> モードのファイル探索順</h4>
+        <p>CJS時代の解決ロジックを模倣する。</p>
+<pre><code>import { foo } from './bar';
+// 1. ./bar.ts
+// 2. ./bar/index.ts
+// 3. ./bar の package.json の main
+// 4. ./bar.js
+// 5. ./bar/index.js</code></pre>
+        <p>これは Node.js が CommonJS オンリーだった時代のロジック。<code>type: "module"</code> や <code>exports</code> フィールドを認識しない。</p>
+
+        <h4>判断</h4>
+        <ul>
+          <li>shared は Node 環境（NestJS の backend で require される）が前提なので <strong><code>node16</code> に切り替え</strong></li>
+          <li><code>module</code> と <code>moduleResolution</code> は <strong>必ずセット</strong>（<code>module: "node16"</code> + <code>moduleResolution: "node16"</code>）</li>
+          <li><code>shared/package.json</code> に <code>"type": "module"</code> がないのでデフォルトで CommonJS 扱い → backend から問題なく require できる</li>
+        </ul>
+
+        <div class="note warn">
+          <strong>注意:</strong> frontend (Nuxt/Vite) では <code>bundler</code> も選択肢になる。学習プロジェクトの shared は Node 主体なので <code>node16</code> で十分。
+        </div>
+      </div>
+    </details>
+
+    <!-- Q5 -->
+    <details class="qa">
+      <summary><code>nest build</code> の incremental ビルド問題（dist/main.js が消える現象）</summary>
+      <div class="qa-body">
+        <p><strong>症状</strong>: <code>pnpm build:backend</code> が成功したように見えるのに、<code>pnpm start:backend</code> で <code>Cannot find module '/.../apps/backend/dist/main'</code> が出る。<code>ls apps/backend/dist/main.js</code> で「No such file or directory」になる。</p>
+
+        <h4>原因</h4>
+        <ul>
+          <li><code>apps/backend/tsconfig.tsbuildinfo</code> に「ビルド済み」と記録される</li>
+          <li>けど <code>apps/backend/dist/</code> が部分的に欠落している状態（過去の途中失敗や手動削除の残骸など）</li>
+          <li>次回 <code>nest build</code> が tsbuildinfo を見て「もうビルド済みだから何もしない」と誤判定</li>
+          <li>結果として <code>dist/main.js</code> が生成されないまま「ビルド成功」のメッセージで終わる</li>
+        </ul>
+
+        <h4>即時解決策（毎回手動でやる場合）</h4>
+<pre><code>rm -rf apps/backend/dist apps/backend/tsconfig.tsbuildinfo
+pnpm build:backend</code></pre>
+
+        <h4>仕組み化する3案</h4>
+        <table>
+          <thead><tr><th>案</th><th>内容</th><th>評価</th></tr></thead>
+          <tbody>
+            <tr><td>A. <code>prebuild</code> フックで自動clean</td><td><code>"prebuild": "rimraf dist tsconfig.tsbuildinfo"</code> を backend package.json に追加</td><td><span class="badge good">おすすめ</span> 確実に再発防止</td></tr>
+            <tr><td>B. tsconfig で <code>"incremental": false</code></td><td>incremental ビルド自体を無効化</td><td>1行変更、ただしビルド時間が増える</td></tr>
+            <tr><td>C. ルートのスクリプトに rm 埋め込み</td><td><code>"build:backend": "rm -rf ... &amp;&amp; ..."</code></td><td>OS依存（Windows ネイティブだとNG）</td></tr>
+          </tbody>
+        </table>
+
+        <div class="note">
+          <strong>教訓:</strong> NestJS + Node v24 + WSL の組み合わせでは tsbuildinfo の信頼性が低い。clean-build を仕組みで担保する方が安心。
+        </div>
+      </div>
+    </details>
+
+    <!-- Q6 -->
+    <details class="qa">
+      <summary><code>nest start --watch</code> (<code>pnpm dev:backend</code>) が WSL で不安定 → SWC builder に切り替えて解消</summary>
+      <div class="qa-body">
+        <p><strong>症状</strong>: <code>pnpm dev:backend</code> が以下のどちらかで失敗する。</p>
+        <ul>
+          <li>ビルドはするけど子プロセスが即死してログだけ残る</li>
+          <li>watch のリロードで dist が一瞬消える瞬間に node が <code>dist/main</code> を見つけられず落ちる</li>
+        </ul>
+
+        <h4>原因の組み合わせ</h4>
+        <div class="ascii-art">[NestJS] --watch を呼ぶ
+    ↓
+[内部] tsc --watch でTSをコンパイル + chokidar でファイル監視
+    ↓
+[Node v24] CJSの新しい挙動（require/import境界）
+    ↓
+[WSL] inotify経由のファイル監視がフィルタを取りこぼす
+    ↓
+[pnpm workspace] symlinkで shared を参照</div>
+        <p>これら全部の組み合わせで不安定になる。NestJS 自体は新しい（11.x、2024年リリース）が、周辺ツールチェーンとの相性問題。</p>
+
+        <h4>解決策: SWC builder に切り替え</h4>
+        <p>NestJS 公式が推奨する <strong>SWC builder</strong> に切り替え。</p>
+        <ul>
+          <li>SWC は Rust 製の TS/JS コンパイラ、tsc より10〜20倍速い</li>
+          <li>watch の安定性も向上</li>
+        </ul>
+
+        <h4>設定方法</h4>
+<pre><code>// apps/backend/nest-cli.json
+{
+  "$schema": "https://json.schemastore.org/nest-cli",
+  "collection": "@nestjs/schematics",
+  "sourceRoot": "src",
+  "compilerOptions": {
+    "deleteOutDir": true,
+    "builder": "swc"
+  }
+}</code></pre>
+
+        <h4>必要なパッケージ</h4>
+        <p><code>@swc/core</code> は Vitest 用に既導入済みだったが、<code>@swc/cli</code> が別途必要。</p>
+<pre><code>pnpm --filter @pick-cash/backend add -D @swc/cli</code></pre>
+
+        <h4>注意点</h4>
+        <ul>
+          <li><code>experimentalDecorators</code> / <code>emitDecoratorMetadata</code> の挙動が tsc と微妙に違う場合がある</li>
+          <li>万一エラー出たら別途 <code>.swcrc</code> 設定で調整するかも</li>
+          <li>今回の pick-cash 構成では <code>@swc/cli</code> インストールだけで動作OK</li>
+        </ul>
+
+        <h4>結果</h4>
+        <ul>
+          <li>ホットリロード安定</li>
+          <li>ビルド速度が体感で爆速に</li>
+        </ul>
+      </div>
+    </details>
+
+    <!-- Q7 -->
+    <details class="qa">
+      <summary><code>pnpm dev:backend</code> と <code>pnpm start:backend</code> の違い</summary>
+      <div class="qa-body">
+        <p>3つのコマンドの役割を整理する。</p>
+
+        <h4>役割の違い</h4>
+        <table>
+          <thead><tr><th>コマンド</th><th>中身</th><th>ビルドする？</th><th>用途</th></tr></thead>
+          <tbody>
+            <tr><td><code>pnpm dev:backend</code></td><td><code>nest start --watch</code></td><td><span class="check">○</span> する（watch + 自動再ビルド + 再起動）</td><td>開発時、コード変更を即反映したい</td></tr>
+            <tr><td><code>pnpm start:backend</code></td><td><code>node dist/main</code></td><td><span class="cross">×</span> しない（ビルド済み dist を実行するだけ）</td><td>本番風の動作確認、CI用</td></tr>
+            <tr><td><code>pnpm build:backend</code></td><td><code>pnpm build:shared &amp;&amp; nest build</code></td><td><span class="check">○</span> する（dist を出力するだけ、起動しない）</td><td>dist を生成したい</td></tr>
+          </tbody>
+        </table>
+
+        <h4>ハマりやすいポイント</h4>
+        <ul>
+          <li><code>start:backend</code> 単独だと最新コードが反映されない → 必ず <code>build:backend &amp;&amp; start:backend</code> のセットで使う</li>
+          <li><code>dev:backend</code> が動くようになれば（SWC builder切替後）開発時は dev だけで完結する</li>
+          <li><code>dev:backend</code> で代用できないケース（CI、本番風確認）では <code>build</code> + <code>start</code> を組み合わせる</li>
+        </ul>
+
+        <h4>学習プロジェクトでの推奨フロー</h4>
+<pre><code># 通常開発
+pnpm dev:backend    # 1ターミナルで起動しっぱなし、コード変更 → 自動反映
+
+# 本番風確認
+pnpm build:backend
+pnpm start:backend</code></pre>
+      </div>
+    </details>
+
+    <!-- Q8 -->
+    <details class="qa">
+      <summary><code>satisfies Prisma.TransactionSelect</code> の意味と、Prismaの型自動生成</summary>
+      <div class="qa-body">
+        <p><strong>疑問</strong>: <code>satisfies Prisma.TransactionSelect</code> って何してるの？ Prismaが型を自動生成してくれるという認識で合ってる？</p>
+
+        <p><strong>答え</strong>: 認識は正しい。整理すると以下の流れ。</p>
+
+        <div class="ascii-art">┌──────────────────────────────────────────────────┐
+│ ① Prisma 側                                       │
+│  prisma generate で型を自動生成                    │
+│  → src/generated/prisma/ 配下に出力               │
+│  → Prisma.TransactionSelect 等                    │
+└──────────────────────────────────────────────────┘
+                    ↑ ここに沿うように
+┌──────────────────────────────────────────────────┐
+│ ② 自前の transactionSelect オブジェクト             │
+│  satisfies Prisma.TransactionSelect でチェック   │
+└──────────────────────────────────────────────────┘
+                    ↑ ②を渡す
+┌──────────────────────────────────────────────────┐
+│ ③ prisma.transaction.findMany({ select: ... })   │
+│  戻り値の型が①+②から自動推論される               │
+└──────────────────────────────────────────────────┘</div>
+
+        <h4><code>satisfies</code> の役割</h4>
+        <ul>
+          <li><code>satisfies</code> は <strong>型を「生成」してない、「チェック」してる</strong></li>
+          <li>リテラル型を保つので、後段の戻り値の型推論が正確になる</li>
+          <li><code>as Prisma.TransactionSelect</code> だと型が広がってしまい、戻り値型が崩れる</li>
+        </ul>
+
+        <h4>コード例</h4>
+<pre><code>// satisfies なし → 戻り値の型がぼやける
+const select = { id: true, ... } as Prisma.TransactionSelect;
+
+// satisfies あり → 戻り値の型がピタリ
+const select = { id: true, ... } satisfies Prisma.TransactionSelect;</code></pre>
+
+        <h4>Prisma 自動生成型の種類</h4>
+        <p><code>schema.prisma</code> の <code>Transaction</code> モデルから自動生成される型たち。</p>
+        <table>
+          <thead><tr><th>型</th><th>全フィールド optional？</th><th>用途</th></tr></thead>
+          <tbody>
+            <tr><td><code>TransactionSelect</code></td><td><span class="check">○</span> optional</td><td>select 句、欲しいフィールド指定</td></tr>
+            <tr><td><code>TransactionWhereInput</code></td><td><span class="check">○</span> optional</td><td>where 句、検索条件</td></tr>
+            <tr><td><code>TransactionCreateInput</code></td><td><span class="cross">×</span> 必須/任意混在</td><td>create の引数、DB上必須は必須</td></tr>
+            <tr><td><code>TransactionUpdateInput</code></td><td><span class="check">○</span> optional</td><td>update の引数、変更したいフィールドだけ</td></tr>
+            <tr><td><code>TransactionOrderByInput</code></td><td><span class="check">○</span> optional</td><td>orderBy 句</td></tr>
+            <tr><td><code>Transaction</code> (実体)</td><td><span class="cross">×</span> 全フィールド必須</td><td>DBから取った後のレコード型</td></tr>
+          </tbody>
+        </table>
+
+        <h4>select系が全部 optional な理由</h4>
+        <ul>
+          <li><code>select</code> は「欲しいフィールドだけ指定」する仕様</li>
+          <li>全部必須だと毎回全部書く羽目になって不便</li>
+          <li>明示的に指定しなかったフィールドは取らない（自動で false 扱い）</li>
+        </ul>
+
+        <h4>戻り値型を明示したい時</h4>
+<pre><code>type TransactionDto = Prisma.TransactionGetPayload&lt;{
+  select: typeof transactionSelect;
+}&gt;;</code></pre>
+        <p><code>GetPayload</code> ヘルパーで select の中身から戻り値型を抽出できる。ただし基本は Prisma の型推論に任せて十分。</p>
+
+        <h4>型ファイル不要の境界線</h4>
+        <table>
+          <thead><tr><th>型の種類</th><th>誰が用意？</th><th>自前で書く？</th></tr></thead>
+          <tbody>
+            <tr><td>DBレコード</td><td>Prisma生成</td><td><span class="cross">×</span></td></tr>
+            <tr><td>DB操作引数型</td><td>Prisma生成</td><td><span class="cross">×</span></td></tr>
+            <tr><td>APIリクエスト/レスポンス契約</td><td>自前（packages/shared に Zod）</td><td><span class="check">○</span></td></tr>
+            <tr><td>アプリ固有の値オブジェクト</td><td>自前</td><td>必要なら</td></tr>
+          </tbody>
+        </table>
+
+        <div class="note">
+          <strong>境界線:</strong> 「DB関連の型は Prisma が全部やってくれる、API契約は自前」が境界線。
+        </div>
+      </div>
+    </details>
   </section>
 </main>
 </body>
