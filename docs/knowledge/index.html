@@ -1088,6 +1088,157 @@ export class CategoriesModule {}</code></pre>
         </div>
       </div>
     </details>
+
+    <!-- Q12 -->
+    <details class="qa">
+      <summary>HTTPステータスコードの基本分類（2xx / 3xx / 4xx / 5xx）は？</summary>
+      <div class="qa-body">
+        <p>REST APIで頻出するHTTPステータスコードは大きく5系統に分類される。pick-cash でも使うコードを中心に整理しておく。</p>
+
+        <h4>5つの大分類</h4>
+        <table>
+          <thead><tr><th>分類</th><th>意味</th><th>代表例</th></tr></thead>
+          <tbody>
+            <tr><td><strong>1xx</strong> Informational</td><td>情報レスポンス（処理続行）</td><td>100 Continue, 101 Switching Protocols</td></tr>
+            <tr><td><strong>2xx</strong> Success</td><td>成功</td><td><strong>200 OK</strong>, <strong>201 Created</strong>, <strong>204 No Content</strong></td></tr>
+            <tr><td><strong>3xx</strong> Redirection</td><td>リダイレクト</td><td>301 Moved Permanently, 302 Found, 304 Not Modified</td></tr>
+            <tr><td><strong>4xx</strong> Client Error</td><td>クライアント側のエラー</td><td><strong>400 Bad Request</strong>, 401 Unauthorized, 403 Forbidden, <strong>404 Not Found</strong>, 409 Conflict, 422 Unprocessable Entity</td></tr>
+            <tr><td><strong>5xx</strong> Server Error</td><td>サーバー側のエラー</td><td><strong>500 Internal Server Error</strong>, 502 Bad Gateway, 503 Service Unavailable</td></tr>
+          </tbody>
+        </table>
+
+        <h4>pick-cash でよく使うコードと NestJS定数</h4>
+        <table>
+          <thead><tr><th>コード</th><th>用途</th><th>NestJS定数</th></tr></thead>
+          <tbody>
+            <tr><td>200 OK</td><td>GET成功、PATCH成功</td><td><code>HttpStatus.OK</code></td></tr>
+            <tr><td>201 Created</td><td>POST成功（作成）</td><td><code>HttpStatus.CREATED</code></td></tr>
+            <tr><td>204 No Content</td><td>DELETE成功（ボディなし）</td><td><code>HttpStatus.NO_CONTENT</code></td></tr>
+            <tr><td>400 Bad Request</td><td>バリデーション失敗、外部キー違反</td><td><code>HttpStatus.BAD_REQUEST</code></td></tr>
+            <tr><td>401 Unauthorized</td><td>認証失敗</td><td><code>HttpStatus.UNAUTHORIZED</code></td></tr>
+            <tr><td>403 Forbidden</td><td>認可失敗</td><td><code>HttpStatus.FORBIDDEN</code></td></tr>
+            <tr><td>404 Not Found</td><td>リソースなし</td><td><code>HttpStatus.NOT_FOUND</code></td></tr>
+            <tr><td>409 Conflict</td><td>一意制約違反</td><td><code>HttpStatus.CONFLICT</code></td></tr>
+            <tr><td>500 Internal Server Error</td><td>想定外サーバーエラー</td><td><code>HttpStatus.INTERNAL_SERVER_ERROR</code></td></tr>
+          </tbody>
+        </table>
+
+        <div class="note">
+          <strong>覚え方:</strong>
+          <ul>
+            <li><strong>2xx = うまくいった</strong></li>
+            <li><strong>3xx = 場所が変わった（リダイレクト）</strong></li>
+            <li><strong>4xx = あなた（クライアント）が悪い</strong></li>
+            <li><strong>5xx = 私（サーバー）が悪い</strong></li>
+          </ul>
+        </div>
+      </div>
+    </details>
+
+    <!-- Q13 -->
+    <details class="qa">
+      <summary><code>HttpStatus</code> enum と <code>@HttpCode()</code> デコレータの正体は？</summary>
+      <div class="qa-body">
+        <p><code>HttpStatus</code> と <code>@HttpCode</code> は NestJS が提供する仕組みで、HTTPステータスコードの定数化とレスポンスステータス指定を担う。</p>
+
+        <h4><code>HttpStatus</code> は NestJS が提供する enum</h4>
+<pre><code>import { HttpStatus } from "@nestjs/common";
+
+HttpStatus.OK                     // = 200
+HttpStatus.CREATED                // = 201
+HttpStatus.NO_CONTENT             // = 204
+HttpStatus.BAD_REQUEST            // = 400
+HttpStatus.NOT_FOUND              // = 404
+HttpStatus.INTERNAL_SERVER_ERROR  // = 500</code></pre>
+
+        <p>中身は数値定数だが、<strong>マジックナンバー回避とタイポ防止</strong>のために提供されている。</p>
+
+<pre><code>// ❌ マジックナンバー
+response.status(404);
+
+// ✅ 意味が明確
+response.status(HttpStatus.NOT_FOUND);</code></pre>
+
+        <h4><code>@HttpCode()</code> でレスポンスのステータスコードを指定</h4>
+        <p>NestJSのデフォルト挙動を上書きするデコレータ:</p>
+<pre><code>import { HttpCode, HttpStatus, Post, Delete } from "@nestjs/common";
+
+@Post()
+@HttpCode(HttpStatus.CREATED)   // 201 を返す（POSTは実はデフォルトでもこれ）
+create() { ... }
+
+@Delete(":id")
+@HttpCode(HttpStatus.NO_CONTENT) // 204 を返す（DELETEのデフォルトは200なので必要）
+remove() { ... }</code></pre>
+
+        <h4>NestJS のデフォルトステータスコード</h4>
+        <p><code>@HttpCode</code> を付けない場合に NestJS が返す既定のステータス:</p>
+        <table>
+          <thead><tr><th>HTTPメソッド</th><th>デフォルトステータス</th><th>補足</th></tr></thead>
+          <tbody>
+            <tr><td><code>@Get()</code></td><td><strong>200 OK</strong></td><td></td></tr>
+            <tr><td><code>@Post()</code></td><td><strong>201 Created</strong> ⭐</td><td>200ではない</td></tr>
+            <tr><td><code>@Put()</code> / <code>@Patch()</code></td><td><strong>200 OK</strong></td><td></td></tr>
+            <tr><td><code>@Delete()</code></td><td><strong>200 OK</strong> ⚠️</td><td>204ではないので注意</td></tr>
+          </tbody>
+        </table>
+
+        <p>つまり:</p>
+        <ul>
+          <li><strong>POST はデフォルトで 201</strong> → <code>@HttpCode(HttpStatus.CREATED)</code> は冗長（ただし「明示する派」もあり）</li>
+          <li><strong>DELETE のデフォルトは 200</strong> → 204 を返したければ <code>@HttpCode(HttpStatus.NO_CONTENT)</code> 必須</li>
+        </ul>
+
+        <p>例外発生時のステータス変換は NestJS の例外クラス（<code>NotFoundException</code> 等）または GlobalExceptionFilter が担当する。</p>
+
+        <div class="note">
+          <strong>補足:</strong>
+          <ul>
+            <li>例外クラスを <code>throw</code> すると、そのクラスに対応するHTTPステータスが自動で返る（例: <code>throw new NotFoundException()</code> → 404）</li>
+            <li>それ以外（Prismaエラーなど）は GlobalExceptionFilter でマッピング</li>
+          </ul>
+        </div>
+      </div>
+    </details>
+
+    <!-- Q14 -->
+    <details class="qa">
+      <summary><code>@HttpCode(204)</code> のとき return 値はどうなる？</summary>
+      <div class="qa-body">
+        <p><code>HTTP 204 No Content</code> は「レスポンスボディなし」が HTTP 規格。NestJS でこれを扱うときの正しい書き方を整理する。</p>
+
+        <h4>NestJSの挙動</h4>
+<pre><code>@Delete(":id")
+@HttpCode(HttpStatus.NO_CONTENT)
+async remove(@Param("id") id: string) {
+  return this.service.remove(id);  // ← 戻り値があってもNestJSが抑制する
+}</code></pre>
+
+        <p>NestJSは <code>@HttpCode(204)</code> を検知すると、ハンドラの返り値があってもボディに乗せない挙動をする（実装観測）。</p>
+
+        <h4>ただし安全で意図の明確な書き方は <code>await</code> のみ</h4>
+        <p><code>return</code> で書くと「204 なのに値返す気？」と読み手が混乱する。意図を明確にするには <code>await</code> だけ書いて void にするのが筋:</p>
+<pre><code>@Delete(":id")
+@HttpCode(HttpStatus.NO_CONTENT)
+async remove(@Param("id") id: string) {
+  // deleteの時は204を返すためボディは空となる。そのためvoidで返すようにawaitしている。
+  await this.service.remove(id);
+}</code></pre>
+
+        <h4>確認方法</h4>
+<pre><code>curl -i -X DELETE http://localhost:3001/transactions/&lt;id&gt;
+# → HTTP/1.1 204 No Content
+#   ヘッダーのみ、ボディなしを確認できる</code></pre>
+
+        <div class="note">
+          <strong>補足:</strong>
+          <ul>
+            <li>pick-cash では DELETE エンドポイントは <code>await</code> だけ書く方針を採用</li>
+            <li>204以外のレスポンスを返すエンドポイントは <code>return</code> で OK</li>
+          </ul>
+        </div>
+      </div>
+    </details>
   </section>
 
   <!-- ============================================ -->
