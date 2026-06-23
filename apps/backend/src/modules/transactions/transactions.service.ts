@@ -24,4 +24,8 @@ export class TransactionsService {
   async update(id: string, data: UpdateTransactionInput) {
     return this.repository.update(id, data);
   }
+
+  async remove(id: string) {
+    return this.repository.remove(id);
+  }
 }

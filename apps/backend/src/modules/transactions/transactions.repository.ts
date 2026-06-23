@@ -77,4 +77,13 @@ export class TransactionsRepository {
       select: transactionSelect,
     });
   }
+
+  async remove(id: string) {
+    return this.prisma.transaction.update({
+      where: { id, deletedAt: null },
+      data: {
+        deletedAt: new Date(),
+      },
+    });
+  }
 }
