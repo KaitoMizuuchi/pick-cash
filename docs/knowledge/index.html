@@ -1986,6 +1986,7 @@ const select = { id: true, ... } satisfies Prisma.TransactionSelect;</code></pre
       <h2>目次</h2>
       <ul>
         <li><a href="#nuxt-setup">セットアップと初期構成</a></li>
+        <li><a href="#vue-sfc">Vue / SFC の基本</a></li>
         <li><a href="#nuxt-imports">ディレクトリ構成と自動インポート</a></li>
         <li><a href="#nuxt-rendering">レンダリングモデル</a></li>
         <li><a href="#nuxt-config">環境変数と runtimeConfig</a></li>
@@ -2218,6 +2219,143 @@ allowBuilds:
 
           <div class="note">
             新しい依存を追加して「Ignored build scripts」警告が出た場合、その都度 <code>pnpm-workspace.yaml</code> の <code>allowBuilds</code> に追加する習慣をつける。pick-cash では <code>@parcel/watcher</code> と <code>esbuild</code> を Nuxt 導入時に追加した。
+          </div>
+        </div>
+      </details>
+    </section>
+
+    <!-- ============================================ -->
+    <!-- カテゴリ: Vue / SFC の基本 -->
+    <!-- ============================================ -->
+    <section class="category" id="vue-sfc">
+      <h2>Vue / SFC の基本</h2>
+      <p class="cat-desc">Vue Single File Component (SFC) の3ブロック構造と、React 関数コンポーネントとの対応関係。Composition API、リアクティビティの基本。</p>
+
+      <!-- Q1 -->
+      <details class="qa">
+        <summary>Vue SFC の3ブロック構造と React 関数コンポーネントとの対応</summary>
+        <div class="qa-body">
+          <p>Vue の Single File Component (SFC) は <code>&lt;script&gt;</code> <code>&lt;template&gt;</code> <code>&lt;style&gt;</code> の3ブロックで構成される。React の関数コンポーネントを書いたことがあれば、対応関係を捉えるとすぐ理解できる。</p>
+
+          <h4>Vue SFC の3ブロック</h4>
+<pre><code>&lt;script setup lang="ts"&gt;
+  // ① ロジック（変数・関数・import）
+  // ↑ React で言うと、関数コンポーネントの return 前の部分
+&lt;/script&gt;
+
+&lt;template&gt;
+  &lt;!-- ② マークアップ（描画するDOM） --&gt;
+  &lt;!-- ↑ React の JSX（return内）に相当 --&gt;
+&lt;/template&gt;
+
+&lt;style scoped&gt;
+  /* ③ スタイル（CSS）*/
+  /* ↑ React の CSS Modules / styled-components 相当 */
+&lt;/style&gt;</code></pre>
+
+          <p>1ファイルにロジック・マークアップ・スタイルが集約されるのが Vue SFC の特徴。</p>
+
+          <h4>React との細かい対応表</h4>
+          <table>
+            <thead><tr><th>機能</th><th>Vue (<code>&lt;script setup&gt;</code>)</th><th>React</th></tr></thead>
+            <tbody>
+              <tr><td>状態</td><td><code>const count = ref(0)</code></td><td><code>const [count, setCount] = useState(0)</code></td></tr>
+              <tr><td>算出値</td><td><code>const doubled = computed(() =&gt; count.value * 2)</code></td><td><code>const doubled = useMemo(() =&gt; count * 2, [count])</code></td></tr>
+              <tr><td>副作用</td><td><code>watch(count, () =&gt; {...})</code></td><td><code>useEffect(() =&gt; {...}, [count])</code></td></tr>
+              <tr><td>マウント時</td><td><code>onMounted(() =&gt; {...})</code></td><td><code>useEffect(() =&gt; {...}, [])</code></td></tr>
+              <tr><td>props</td><td><code>const props = defineProps&lt;{...}&gt;()</code></td><td><code>function Foo(props: ...)</code></td></tr>
+              <tr><td>イベント発火</td><td><code>const emit = defineEmits&lt;{...}&gt;()</code></td><td>コールバック props</td></tr>
+            </tbody>
+          </table>
+
+          <h4>SFC のメリット</h4>
+          <table>
+            <thead><tr><th>観点</th><th>Vue SFC</th><th>React</th></tr></thead>
+            <tbody>
+              <tr><td>ファイル数</td><td>少ない（1コンポーネント1ファイル）</td><td>スタイル別ファイルになりがち</td></tr>
+              <tr><td>ロジック↔マークアップの近さ</td><td>同じファイルで近接</td><td>同じファイル内、ただし JSX 中に絡む</td></tr>
+              <tr><td>学習コスト</td><td><code>&lt;template&gt;</code> の特殊構文を覚える</td><td>JSX の構文を覚える</td></tr>
+            </tbody>
+          </table>
+
+          <p>どちらが優れているというより<strong>思想の違い</strong>。React 知識がある人は対応関係を意識すれば SFC もすぐ書けるようになる。</p>
+
+          <h4><code>&lt;script setup&gt;</code> の <code>setup</code> の意味</h4>
+          <p>Vue 3 には2つの書き方がある:</p>
+          <ul>
+            <li><strong>Composition API（推奨・モダン）</strong>: <code>&lt;script setup&gt;</code> を使う書き方</li>
+            <li><strong>Options API（旧）</strong>: <code>&lt;script&gt;</code> の中で <code>data()</code> / <code>methods</code> / <code>computed</code> をオブジェクトで宣言する書き方</li>
+          </ul>
+          <p><code>setup</code> キーワード = Composition API を使う宣言。<strong>Nuxt 3/4 ではほぼ100% <code>&lt;script setup&gt;</code> でOK</strong>。<br>
+          昔の Vue 2 系チュートリアル見ると Options API のことが多いが、現代では避けていい。</p>
+
+          <div class="note">
+            React Hooks のメンタルモデルとほぼ同じ。<code>ref</code> を <code>useState</code>、<code>computed</code> を <code>useMemo</code>、<code>watch</code> を <code>useEffect</code> と読み替えるとほぼ意味が通る。
+          </div>
+        </div>
+      </details>
+
+      <!-- Q2 -->
+      <details class="qa">
+        <summary>Vue のリアクティビティ（<code>.value</code>）と <code>&lt;script setup&gt;</code> の自動連携</summary>
+        <div class="qa-body">
+          <p>React と Vue で実装が異なる「リアクティビティ」と、<code>&lt;script setup&gt;</code> 特有の便利機能を整理する。</p>
+
+          <h4>React との大きな違い ① 値の参照に <code>.value</code> が必要</h4>
+<pre><code>const count = ref(0)
+count.value++             // ← 書き換える時は .value
+console.log(count.value)  // ← 読む時も .value</code></pre>
+
+          <p>これは Vue のリアクティビティが「ラッパー型 (Ref) で値を包んで監視する」仕組みだから。<code>useState</code> のように setter 関数を介さず、値の代入で更新できる。</p>
+
+          <p>ただし <code>&lt;template&gt;</code> 内では <code>.value</code> 不要（Vue が自動アンラップ）:</p>
+<pre><code>&lt;template&gt;
+  &lt;p&gt;{{ count }}&lt;/p&gt;           &lt;!-- count.value じゃなくて count でOK --&gt;
+  &lt;button @click="count++"&gt;+1&lt;/button&gt;
+&lt;/template&gt;</code></pre>
+
+          <p>「<strong>スクリプト内: <code>.value</code> 必要 / テンプレート内: <code>.value</code> 不要</strong>」と覚える。</p>
+
+          <h4><code>reactive()</code> という別の選択肢（参考）</h4>
+          <p>オブジェクト全体をリアクティブにしたい場合:</p>
+<pre><code>const state = reactive({ count: 0, name: 'hoge' })
+state.count++          // ← .value 不要、直接プロパティを書き換え
+console.log(state.name)</code></pre>
+
+          <p>ただし <code>ref</code> の方が分割代入で値を散らしにくく、デバッグもしやすいので一般的には <code>ref</code> を使う。Vue 3 のベストプラクティスでも <code>ref</code> が推奨。</p>
+
+          <h4>React との大きな違い ② import 内容が <code>&lt;template&gt;</code> でも使える（自動連携）</h4>
+          <p><code>&lt;script setup&gt;</code> で import した変数・関数・コンポーネントは、<strong>そのまま <code>&lt;template&gt;</code> で参照できる</strong>。</p>
+<pre><code>&lt;script setup&gt;
+import MyButton from './MyButton.vue'
+const handleClick = () =&gt; alert('click')
+&lt;/script&gt;
+
+&lt;template&gt;
+  &lt;MyButton @click="handleClick"&gt;押す&lt;/MyButton&gt;
+  &lt;!-- ↑ MyButton も handleClick も import/宣言したものが直接使える --&gt;
+&lt;/template&gt;</code></pre>
+
+          <p>React で言うと「JSX に書く JSX タグ・変数は自動で props として注入される」みたいな感覚。コンパイラがスクリプトとテンプレートを連携してくれる。</p>
+
+          <h4>Nuxt の自動インポートと組み合わせると</h4>
+          <p>Nuxt は <code>app/components/</code> <code>app/composables/</code> を自動インポートするので、<code>import</code> 文すら書かない:</p>
+<pre><code>&lt;script setup lang="ts"&gt;
+// import 文ゼロでも、Nuxt の自動インポートで利用可能
+const { data } = await useFetch('/api/transactions')  // ← useFetch は Nuxt 提供、自動 import
+&lt;/script&gt;
+
+&lt;template&gt;
+  &lt;MyButton&gt;クリック&lt;/MyButton&gt;  &lt;!-- ← app/components/MyButton.vue が自動 import --&gt;
+&lt;/template&gt;</code></pre>
+
+          <p>これが Nuxt が「書く量を最小化する」と言われる所以の一つ。</p>
+
+          <div class="note">
+            <ul>
+              <li><code>ref()</code> / <code>computed()</code> / <code>watch()</code> / <code>onMounted()</code> も Nuxt の自動インポート対象なので、<code>import { ref } from 'vue'</code> を書く必要がない（Vue 単体だと書く必要がある）</li>
+              <li>純 Vue から Nuxt に移行すると「import が消える」体感が強い</li>
+            </ul>
           </div>
         </div>
       </details>
