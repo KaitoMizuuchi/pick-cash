@@ -1988,6 +1988,7 @@ const select = { id: true, ... } satisfies Prisma.TransactionSelect;</code></pre
         <li><a href="#nuxt-setup">セットアップと初期構成</a></li>
         <li><a href="#nuxt-imports">ディレクトリ構成と自動インポート</a></li>
         <li><a href="#nuxt-rendering">レンダリングモデル</a></li>
+        <li><a href="#nuxt-config">環境変数と runtimeConfig</a></li>
       </ul>
     </nav>
 
@@ -2365,6 +2366,304 @@ allowBuilds:
               <li>Nuxt: Vue のリアクティビティと SFC（Single File Component）モデルを土台に「同じコンポーネントが両方で動く」設計</li>
             </ul>
             Vue/React のフレームワーク思想の違いがメタフレームワークにも反映されている。
+          </div>
+        </div>
+      </details>
+
+      <!-- Q2 -->
+      <details class="qa">
+        <summary>Nuxt の SPA モード設定（<code>ssr: false</code>）と pick-cash での選択理由</summary>
+        <div class="qa-body">
+          <p>Nuxt は SSR がデフォルトだが、<code>nuxt.config.ts</code> の <code>ssr: false</code> で SPA に切り替えられる。pick-cash は SPA を選択した。</p>
+
+          <h4>設定方法</h4>
+<pre><code>// nuxt.config.ts
+export default defineNuxtConfig({
+  ssr: false,  // SPA モードに切り替え
+})</code></pre>
+
+          <p>これだけでサーバーサイドレンダリングが無効化される。</p>
+
+          <h4>pick-cash で SPA を選んだ理由</h4>
+          <table>
+            <thead><tr><th>観点</th><th>評価</th></tr></thead>
+            <tbody>
+              <tr><td><strong>認証必須</strong>（公開ページなし）</td><td><span class="check">✅</span> SPA で十分</td></tr>
+              <tr><td><strong>SEO 必要？</strong></td><td><span class="cross">❌</span> 家計簿を検索エンジンに載せない</td></tr>
+              <tr><td><strong>初回表示速度</strong></td><td>△ そこそこでいい（ログインユーザー向けなので）</td></tr>
+              <tr><td><strong>実装シンプルさ</strong></td><td><span class="check">✅</span> SPA の方が認証フローが素直に書ける</td></tr>
+            </tbody>
+          </table>
+          <p>→ <strong>SPA 一択</strong>。</p>
+
+          <h4>SPA モードの動き</h4>
+          <div class="ascii-art">[クライアント] → http://localhost:3000 にアクセス
+[Nuxt サーバ] → 空に近いHTML（&lt;div id="__nuxt"&gt;&lt;/div&gt; 程度）を返す
+[クライアント] → JS が起動、Vue がDOMを描画、API を fetch</div>
+          <p>サーバーは「JSバンドルを配るだけ」になる。</p>
+
+          <h4>SSR を使う場面（参考）</h4>
+          <ul>
+            <li>公開ページ（SEO 必要）: ブログ、ランディングページ、ECサイト</li>
+            <li>初回描画速度が重要: ニュースサイト</li>
+            <li>OGPタグでサムネを動的生成</li>
+          </ul>
+          <p>これらが必要になれば後から <code>ssr: true</code>（または routeRules で個別指定）に変更可能。<strong>設定一行で切替可能</strong>なのが Nuxt の強み。</p>
+
+          <h4>注意: SPAモードでは server/api/ も実質使わない</h4>
+          <p>Nuxt の <code>server/api/</code> ディレクトリは Nitro（Nuxt 内蔵サーバー）でサーバーレス関数として動く。SPA モードでも書けば動くが、pick-cash は backend (NestJS) を別建てしているのでこちらは使わない。</p>
+
+          <div class="note">
+            <strong>Nuxt 3 / Nuxt 4 共通の仕様</strong>。<code>ssr: false</code> は Nuxt 3 から提供されている設定で、Nuxt 4 でも同じ書き方で動く。
+          </div>
+        </div>
+      </details>
+    </section>
+
+    <!-- ============================================ -->
+    <!-- カテゴリ: 環境変数と runtimeConfig -->
+    <!-- ============================================ -->
+    <section class="category" id="nuxt-config">
+      <h2>環境変数と runtimeConfig</h2>
+      <p class="cat-desc">Nuxt の <code>runtimeConfig</code> の役割、<code>.env</code> との関係、<code>public</code> / private の使い分け、環境変数のケース変換ルール。</p>
+
+      <!-- Q1 -->
+      <details class="qa">
+        <summary><code>runtimeConfig</code> の役割と <code>.env</code> との関係</summary>
+        <div class="qa-body">
+          <p>Nuxt の環境変数管理は <code>nuxt.config.ts</code> の <code>runtimeConfig</code> と <code>.env</code> の組み合わせで成立する。両方の役割の違いを整理する。</p>
+
+          <h4>それぞれの役割</h4>
+          <table>
+            <thead><tr><th></th><th>役割</th></tr></thead>
+            <tbody>
+              <tr><td><code>nuxt.config.ts</code> の <code>runtimeConfig</code></td><td><strong>スキーマ宣言 + デフォルト値 + 型推論</strong></td></tr>
+              <tr><td><code>.env</code></td><td><strong>環境ごとに上書きする実際の値</strong></td></tr>
+            </tbody>
+          </table>
+          <p>「どちらかが保険」というより<strong>ペアで使うべきもの</strong>。「設計図」と「実物」の関係。</p>
+
+          <h4>パターン別の挙動</h4>
+
+          <h5>パターンA: <code>runtimeConfig</code> あり / <code>.env</code> なし</h5>
+<pre><code>// nuxt.config.ts
+runtimeConfig: { public: { apiBase: 'http://localhost:3001' } }</code></pre>
+          <p>→ デフォルト値そのまま使われる。<strong>開発時に手軽に動かす分はこれで十分</strong>。</p>
+
+          <h5>パターンB: <code>runtimeConfig</code> あり / <code>.env</code> あり <span class="badge good">pick-cash 採用</span></h5>
+<pre><code>runtimeConfig: { public: { apiBase: 'http://localhost:3001' } }  // デフォルト</code></pre>
+<pre><code>NUXT_PUBLIC_API_BASE=http://localhost:3001</code></pre>
+          <p>→ <code>.env</code> の値が <code>runtimeConfig</code> を上書き。</p>
+
+          <h5>パターンC: <code>runtimeConfig</code> なし / <code>.env</code> あり</h5>
+          <p>→ 実は動く。Nuxt は <code>NUXT_PUBLIC_*</code> 形式の環境変数を自動で <code>useRuntimeConfig().public</code> に流し込む仕組みがある。</p>
+          <p>ただし問題:</p>
+          <ul>
+            <li><span class="cross">❌</span> TypeScript の型補完が効かない（<code>config.public.apiBase</code> の型がない）</li>
+            <li><span class="cross">❌</span> どんなキーが存在するか一覧できない</li>
+            <li><span class="cross">❌</span> タイポしてもエラーにならない（<code>config.public.apiBass</code> でも通る）</li>
+          </ul>
+
+          <h5>パターンD: <code>runtimeConfig</code> なし / <code>.env</code> なし</h5>
+          <p>→ undefined になり動かない。</p>
+
+          <h4>値の解決優先度</h4>
+          <div class="ascii-art">OS環境変数 &gt; .env &gt; runtimeConfig のデフォルト</div>
+          <p><code>useRuntimeConfig()</code> を呼ぶと:</p>
+          <ol>
+            <li>環境変数（<code>NUXT_PUBLIC_API_BASE</code> 等）があればそれを使う</li>
+            <li>なければ <code>runtimeConfig</code> のデフォルト値</li>
+            <li>それもなければ undefined</li>
+          </ol>
+
+          <h4>なぜ両方書く？</h4>
+          <p><code>runtimeConfig</code> を書くメリット:</p>
+          <ul>
+            <li><span class="check">✅</span> <strong>型推論が効く</strong>: VSCode で <code>config.public.api</code> まで打ったら <code>apiBase</code> が補完される</li>
+            <li><span class="check">✅</span> <strong>どんな値が存在するか一覧できる</strong>: コードを読むだけで分かる</li>
+            <li><span class="check">✅</span> <strong>デフォルト値</strong>: <code>.env</code> を書かなくても dev で動く</li>
+          </ul>
+          <p><code>.env</code> を書くメリット:</p>
+          <ul>
+            <li><span class="check">✅</span> <strong>環境ごとに切替可能</strong>: dev / staging / prod で値を変えられる</li>
+            <li><span class="check">✅</span> <strong>gitignore できる</strong>: 機密値も置ける</li>
+            <li><span class="check">✅</span> <strong>本番デプロイで便利</strong>: Vercel/AWS等の管理画面から環境変数注入できる</li>
+          </ul>
+
+          <h4>pick-cash の運用パターン</h4>
+          <div class="ascii-art">[開発時]
+.env でローカルbackendを指定:
+NUXT_PUBLIC_API_BASE=http://localhost:3001
+
+[本番デプロイ時（将来）]
+.env はコミットしない、デプロイ環境で OS環境変数として注入:
+NUXT_PUBLIC_API_BASE=https://api.pick-cash.example.com
+
+[runtimeConfig は常にデフォルトを保持]
+コードで「apiBase が確実にある」と前提できる</div>
+
+          <h4>比較表（シナリオ別）</h4>
+          <table>
+            <thead><tr><th>シナリオ</th><th><code>runtimeConfig</code></th><th><code>.env</code></th></tr></thead>
+            <tbody>
+              <tr><td>プロトタイプ・趣味アプリ</td><td>あれば便利</td><td>なくてもいい</td></tr>
+              <tr><td>個人開発（pick-cash）</td><td><strong>書く</strong>（型・補完目当て）</td><td><strong>書く</strong>（環境切替の準備）</td></tr>
+              <tr><td>チーム開発</td><td>必須（仕様としての一覧）</td><td>必須（個人ごとの値）</td></tr>
+              <tr><td>本番デプロイ</td><td>必須（デフォルト + 型）</td><td>不要（OS環境変数で上書き）</td></tr>
+            </tbody>
+          </table>
+
+          <div class="note">
+            「<code>runtimeConfig</code> = 仕様 / <code>.env</code> = 環境固有の実値」と覚えとくと迷わない。<br />
+            <strong>Nuxt 3 から同じ仕様</strong>で、Nuxt 4 でも踏襲されている。
+          </div>
+        </div>
+      </details>
+
+      <!-- Q2 -->
+      <details class="qa">
+        <summary><code>runtimeConfig</code> の <code>public</code> と private の使い分け（「クライアントに露出」の誤解）</summary>
+        <div class="qa-body">
+          <p><code>runtimeConfig</code> には <code>public</code> 配下と、それ以外（トップレベル = private）がある。「public はクライアントに露出する」と聞くと「秘密じゃないの？」と混乱しやすい。</p>
+
+          <h4>環境変数 = 全部秘匿、ではない</h4>
+          <p>環境変数は2種類ある:</p>
+          <table>
+            <thead><tr><th>種類</th><th>例</th><th>クライアントに渡す？</th></tr></thead>
+            <tbody>
+              <tr><td><strong>公開してOKな値</strong></td><td>API URL、公開鍵（Stripe Publishable Key）、Google Analytics ID</td><td><span class="check">✅</span> 渡す（<strong>渡さないと動かない</strong>）</td></tr>
+              <tr><td><strong>秘匿すべき値</strong></td><td>DB パスワード、API シークレットキー、JWT 署名鍵</td><td><span class="cross">❌</span> 絶対渡さない</td></tr>
+            </tbody>
+          </table>
+          <p>「環境変数」というカテゴリの中に<strong>両方ある</strong>。</p>
+
+          <h4><code>runtimeConfig</code> の本当の役割</h4>
+          <p>「クライアントに渡すか / 渡さないか」を<strong>明示的に切り分けられる仕組み</strong>。</p>
+<pre><code>runtimeConfig: {
+  apiSecret: '',              // ← サーバー専用（クライアントには漏れない）
+  public: {
+    apiBase: 'http://...',    // ← クライアントにも渡す（明示的に public 宣言）
+  },
+}</code></pre>
+          <ul>
+            <li><code>public:</code> 配下に書いた値だけクライアントに渡る</li>
+            <li>それ以外（トップレベル）はサーバーだけが見える</li>
+          </ul>
+          <p>「安全」というのは「<strong>何でも秘匿する</strong>」ではなく、「<strong>渡すものと渡さないものを意図的に区別できる</strong>」って意味。</p>
+
+          <h4>なぜ apiBase は public か？</h4>
+          <p>そもそも apiBase（backend のURL）は秘匿しても意味がない。理由:</p>
+          <ol>
+            <li>クライアントがそのURLを叩く側だから、知らないと動かない</li>
+            <li>ブラウザのネットワークタブで通信を見れば、誰でもURLを確認できる</li>
+            <li>URL自体は「公開情報」（隠してもセキュリティ上の意味がない）</li>
+          </ol>
+          <div class="ascii-art">[ユーザーのブラウザ]
+     ↓ fetch('http://localhost:3001/transactions')
+     ↓ ← apiBase の値をクライアントが知っている必要がある
+[backend (NestJS)]</div>
+
+          <h4>「安全」を3つに分解</h4>
+          <p>「環境変数を安全に扱う」って言葉には3つの効果が含まれる:</p>
+          <table>
+            <thead><tr><th>効果</th><th>内容</th></tr></thead>
+            <tbody>
+              <tr><td>① <strong>コードからの分離</strong></td><td>URL や秘密情報をハードコードしない → <code>.env</code> でコミット対象から外せる</td></tr>
+              <tr><td>② <strong>環境ごとの切り替え</strong></td><td>dev: <code>localhost:3001</code>、prod: <code>https://api.example.com</code> を簡単に切替</td></tr>
+              <tr><td>③ <strong>秘匿境界の明示</strong></td><td><code>public</code> か否かで「クライアントに渡すか」をコードレベルで明確化</td></tr>
+            </tbody>
+          </table>
+          <ul>
+            <li><code>public</code> = ②の効果は享受、③の秘匿効果は<strong>なし</strong>（公開していい情報だから）</li>
+            <li>private = ②と③の両方の効果</li>
+          </ul>
+
+          <h4>pick-cash の場合</h4>
+          <ul>
+            <li><strong>SPAモード</strong>で動かしてる = サーバー側で実行される frontend コードはほぼ存在しない</li>
+            <li>frontend の <code>runtimeConfig</code> トップレベル（private）に書く意味はほぼない</li>
+            <li>秘密情報は全部 backend (NestJS) の <code>.env</code> に閉じ込めている（DB接続情報など）</li>
+            <li>frontend は backend を叩くだけ → apiBase さえ public に置けば十分</li>
+          </ul>
+
+          <h4>比較: ハードコード vs <code>runtimeConfig.public</code></h4>
+<pre><code>// ❌ ハードコード
+fetch('http://localhost:3001/transactions')
+// → 本番環境にデプロイするときコード書き換え必要
+
+// ✅ runtimeConfig.public
+const { apiBase } = useRuntimeConfig().public;
+fetch(`${apiBase}/transactions`)
+// → .env で値を差し替えるだけ
+// → URL自体はバンドルに埋め込まれてクライアントに届く（けど元々隠す意味なし）</code></pre>
+          <p>両方とも「URL がクライアントに届く」点は同じ。違いは「環境ごとに切り替えやすい」「ハードコードしてない」という運用上のメリット。</p>
+
+          <div class="note">
+            「環境変数 = 全部秘密」という思い込みを外すのが第一歩。「クライアントに渡していい値も環境変数で管理する」のが現代Webアプリの普通の作りで、その時に「渡す/渡さない」を明示的に区別できるのが <code>runtimeConfig</code> の値。
+          </div>
+        </div>
+      </details>
+
+      <!-- Q3 -->
+      <details class="qa">
+        <summary>環境変数のケース変換ルール（<code>apiBase</code> と <code>NUXT_PUBLIC_API_BASE</code>）</summary>
+        <div class="qa-body">
+          <p><code>runtimeConfig.public.apiBase</code>（キャメルケース）と <code>.env</code> の <code>NUXT_PUBLIC_API_BASE</code>（アッパースネーク）は同じ値を指す。Nuxt が自動でケース変換する仕組み。</p>
+
+          <h4>変換ルール表</h4>
+          <table>
+            <thead><tr><th><code>runtimeConfig</code> のキー（JSキャメル）</th><th>対応する環境変数（アッパースネーク）</th></tr></thead>
+            <tbody>
+              <tr><td><code>runtimeConfig.public.apiBase</code></td><td><code>NUXT_PUBLIC_API_BASE</code></td></tr>
+              <tr><td><code>runtimeConfig.apiSecret</code></td><td><code>NUXT_API_SECRET</code></td></tr>
+              <tr><td><code>runtimeConfig.public.googleAnalyticsId</code></td><td><code>NUXT_PUBLIC_GOOGLE_ANALYTICS_ID</code></td></tr>
+              <tr><td><code>runtimeConfig.databaseUrl</code></td><td><code>NUXT_DATABASE_URL</code></td></tr>
+            </tbody>
+          </table>
+
+          <h4>ルールの内訳</h4>
+          <div class="ascii-art">NUXT_PUBLIC_API_BASE
+─┬── ──┬──── ──┬───
+ │     │       │
+ │     │       └─ runtimeConfig のキー（apiBase → API_BASE）
+ │     │
+ │     └─ public 配下なら "PUBLIC" が入る
+ │
+ └─ Nuxt の固定プレフィックス</div>
+
+          <h4>ネスト構造への対応</h4>
+          <p>JSキャメルの大文字直前で <code>_</code> 区切りに変換される:</p>
+<pre><code>runtimeConfig: {
+  public: {
+    apiBase: '...',          // → NUXT_PUBLIC_API_BASE
+    googleClientId: '...',   // → NUXT_PUBLIC_GOOGLE_CLIENT_ID
+    feature: {
+      enableDarkMode: true,  // → NUXT_PUBLIC_FEATURE_ENABLE_DARK_MODE
+    },
+  },
+}</code></pre>
+
+          <h4>なぜ変換が必要？</h4>
+          <table>
+            <thead><tr><th>場所</th><th>慣習</th></tr></thead>
+            <tbody>
+              <tr><td><strong>JS/TS のコード</strong></td><td>キャメルケース（<code>apiBase</code>）</td></tr>
+              <tr><td><strong>OS環境変数</strong></td><td>アッパースネーク（<code>NUXT_PUBLIC_API_BASE</code>）</td></tr>
+            </tbody>
+          </table>
+          <p>各言語・場所で「読みやすい命名」が違うので、Nuxt が橋渡ししている。書き手は<strong>両方の慣習を守れる</strong>。</p>
+
+          <h4>確認方法</h4>
+<pre><code>// コンポーネント / composable
+const config = useRuntimeConfig();
+console.log(config.public.apiBase);
+// → .env の NUXT_PUBLIC_API_BASE があればそれ、なければ runtimeConfig のデフォルト</code></pre>
+
+          <div class="note">
+            <strong>覚え方:</strong><br />
+            - コードで使う側: <strong>キャメル</strong> (<code>apiBase</code>)<br />
+            - <code>.env</code> で書く側: <strong><code>NUXT_</code> + アッパースネーク</strong> (<code>NUXT_PUBLIC_API_BASE</code>)<br />
+            同じものを2つの命名規則で表現してるだけ。
           </div>
         </div>
       </details>
