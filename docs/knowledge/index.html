@@ -236,6 +236,33 @@
   }
   .check { color: var(--good); }
   .cross { color: var(--bad); }
+  .tabs {
+    display: flex;
+    gap: 8px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 32px;
+  }
+  .tab-button {
+    padding: 10px 20px;
+    background: transparent;
+    border: none;
+    color: var(--text-dim);
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: color 0.15s, border-color 0.15s;
+    font-family: inherit;
+  }
+  .tab-button:hover {
+    color: var(--text);
+  }
+  .tab-button.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+  }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
 </style>
 </head>
 <body>
@@ -245,6 +272,12 @@
     <p>NestJS / Nuxt 学習プロジェクトの中で出てきた疑問と解説。新しいトピックは追記していく。</p>
   </header>
 
+  <nav class="tabs">
+    <button class="tab-button active" data-tab="nestjs">NestJS</button>
+    <button class="tab-button" data-tab="nuxt">Nuxt</button>
+  </nav>
+
+  <section class="tab-panel active" id="tab-nestjs">
   <nav class="toc">
     <h2>目次</h2>
     <ul>
@@ -1946,6 +1979,178 @@ const select = { id: true, ... } satisfies Prisma.TransactionSelect;</code></pre
       </div>
     </details>
   </section>
+  </section>
+
+  <section class="tab-panel" id="tab-nuxt">
+    <nav class="toc">
+      <h2>目次</h2>
+      <ul>
+        <li><a href="#nuxt-imports">ディレクトリ構成と自動インポート</a></li>
+        <li><a href="#nuxt-rendering">レンダリングモデル</a></li>
+      </ul>
+    </nav>
+
+    <!-- ============================================ -->
+    <!-- カテゴリ: ディレクトリ構成と自動インポート -->
+    <!-- ============================================ -->
+    <section class="category" id="nuxt-imports">
+      <h2>ディレクトリ構成と自動インポート</h2>
+      <p class="cat-desc">Nuxt のディレクトリ規約と自動インポートの仕組み。features/ パターンで分割する際の設定方法。</p>
+
+      <!-- Q1 -->
+      <details class="qa">
+        <summary>Nuxt の自動インポートの仕組みと <code>features/</code> 構成での対応</summary>
+        <div class="qa-body">
+          <p>Nuxt は特定ディレクトリの中身を自動でインポートしてくれる仕組みがある。これによって <code>&lt;script setup&gt;</code> で <code>import</code> 文を書かずに composable や component を使える。</p>
+
+          <h4>Nuxt のデフォルト自動インポート対象</h4>
+          <table>
+            <thead><tr><th>ディレクトリ</th><th>自動インポートされるもの</th></tr></thead>
+            <tbody>
+              <tr><td><code>app/components/</code></td><td>コンポーネント（テンプレート内で <code>&lt;HogeFuga /&gt;</code> として直接使える）</td></tr>
+              <tr><td><code>app/composables/</code></td><td>composable 関数（<code>&lt;script setup&gt;</code> で import 不要）</td></tr>
+              <tr><td><code>app/utils/</code></td><td>ユーティリティ関数</td></tr>
+              <tr><td><code>app/middleware/</code></td><td>ルートミドルウェア</td></tr>
+              <tr><td><code>app/stores/</code></td><td>Pinia store（<code>@pinia/nuxt</code> 入れた場合）</td></tr>
+            </tbody>
+          </table>
+
+          <h4>features/ を採用する場合の設定</h4>
+          <p><code>features/</code> 配下のディレクトリはデフォルトでは自動インポートされない。<code>nuxt.config.ts</code> で明示的に指定する必要がある:</p>
+<pre><code>export default defineNuxtConfig({
+  components: {
+    dirs: [
+      '~/components',
+      { path: '~/features/**/components', pathPrefix: false },
+    ],
+  },
+  imports: {
+    dirs: [
+      'composables/**',
+      'features/**/composables',
+    ],
+  },
+})</code></pre>
+
+          <h4><code>pathPrefix: false</code> の効果</h4>
+          <p><code>features/transactions/components/TransactionList.vue</code> というファイルを、デフォルトのままだと <code>&lt;TransactionsComponentsTransactionList /&gt;</code> のような長い名前になる。<code>pathPrefix: false</code> で <strong><code>&lt;TransactionList /&gt;</code></strong> とそのまま使えるようになる。</p>
+
+          <h4>pick-cash のディレクトリ構成イメージ</h4>
+          <div class="ascii-art">apps/frontend/
+└── app/
+    ├── components/                 ← 共通UI（Button, Modal等）
+    ├── composables/                ← 共通composable（useToast等）
+    ├── pages/
+    │   ├── index.vue               ← /
+    │   └── transactions/
+    │       └── index.vue           ← /transactions
+    ├── utils/
+    ├── types/
+    └── features/
+        ├── transactions/
+        │   ├── components/         ← Transaction専用UI
+        │   ├── composables/        ← useTransactions等
+        │   └── types.ts
+        └── categories/
+            └── composables/</div>
+
+          <h4>共通UI vs 機能専用UI の判断基準</h4>
+          <table>
+            <thead><tr><th>状況</th><th>どこに置く？</th></tr></thead>
+            <tbody>
+              <tr><td>2機能以上で使う</td><td><code>app/components/</code></td></tr>
+              <tr><td>1機能だけで使う</td><td><code>app/features/&lt;機能&gt;/components/</code></td></tr>
+              <tr><td>汎用パーツ（Button, Modal）</td><td><code>app/components/</code></td></tr>
+              <tr><td>機能依存のUI（取引一覧行など）</td><td><code>app/features/transactions/components/</code></td></tr>
+            </tbody>
+          </table>
+
+          <div class="note">
+            「将来別機能でも使うかも？」と迷ったら <strong>まず機能配下に置いて、必要になったら共通へ移す</strong> 順序が安全。逆方向（共通→個別）は他の機能が依存していると剥がしにくい。
+          </div>
+        </div>
+      </details>
+    </section>
+
+    <!-- ============================================ -->
+    <!-- カテゴリ: レンダリングモデル -->
+    <!-- ============================================ -->
+    <section class="category" id="nuxt-rendering">
+      <h2>レンダリングモデル</h2>
+      <p class="cat-desc">Nuxt のコンポーネントレンダリング方式と、Next.js (App Router) との思想的違い。</p>
+
+      <!-- Q1 -->
+      <details class="qa">
+        <summary>Next.js App Router と Nuxt のレンダリングモデルの違い</summary>
+        <div class="qa-body">
+          <p>Vue 系のメタフレームワーク Nuxt と React 系の Next.js（App Router 時代）は、コンポーネントのレンダリング方式が <strong>思想レベルで異なる</strong>。</p>
+
+          <h4>Next.js (App Router) — React 18+</h4>
+          <div class="ascii-art">コンポーネントには2種類ある
+├── Server Components（デフォルト）
+│    - サーバーで実行、結果のHTMLだけクライアントに送る
+│    - DB直接アクセス可、API tokenをクライアントに漏らさない
+│    - useState/useEffect 使えない
+└── Client Components（"use client" 宣言）
+     - クライアントでも実行、インタラクティブ
+     - useState/useEffect 使える</div>
+
+          <p>「コンポーネント毎にサーバー / クライアントを使い分ける」のが Next.js。明示的に区別する設計。</p>
+
+          <h4>Nuxt — Vue 3 ベース</h4>
+          <div class="ascii-art">コンポーネントは「ユニバーサル」（特に区別なし）
+├── どのコンポーネントも、サーバーでもクライアントでも実行できる
+├── レンダリング位置の制御は「ページ単位 / アプリ単位」で設定
+└── 「ここはクライアントだけで動かしたい」場合は &lt;ClientOnly&gt; タグで囲む</div>
+
+          <p>Vue のコンポーネントは1種類。同じコンポーネントが状況に応じてサーバーで実行されたりクライアントで実行されたりする。</p>
+
+          <h4>比較表</h4>
+          <table>
+            <thead><tr><th>観点</th><th>Next.js App Router</th><th>Nuxt</th></tr></thead>
+            <tbody>
+              <tr><td>コンポーネントの種類</td><td>2種類（Server/Client）</td><td>1種類（ユニバーサル）</td></tr>
+              <tr><td>区別の方法</td><td><code>"use client"</code> 宣言</td><td>なし</td></tr>
+              <tr><td>サーバー専用処理</td><td>Server Componentに書く</td><td><code>server/api/</code> または <code>useFetch({server: true})</code></td></tr>
+              <tr><td>データ取得</td><td>Server Componentで直接 <code>await db.query()</code></td><td><code>useFetch()</code> / <code>useAsyncData()</code></td></tr>
+              <tr><td>認証情報の隠蔽</td><td>Server Component で完結</td><td><code>useRuntimeConfig</code> で server 専用キー</td></tr>
+            </tbody>
+          </table>
+
+          <h4>pick-cash は SPA モード</h4>
+          <p><code>ssr: false</code> 設定なので:</p>
+          <ul>
+            <li>すべてクライアント側で実行</li>
+            <li>「Server Components」の概念そのものが無関係</li>
+            <li>普通の Vue SPA を Nuxt で書く感覚</li>
+            <li>Nuxt の <code>server/api/</code> も使わない（backend は NestJS で別建て）</li>
+          </ul>
+
+          <div class="note">
+            <strong>なぜこの違いが生まれた？</strong>
+            <ul>
+              <li>Next.js: React Server Components という React 自体の新機能を活用する設計</li>
+              <li>Nuxt: Vue のリアクティビティと SFC（Single File Component）モデルを土台に「同じコンポーネントが両方で動く」設計</li>
+            </ul>
+            Vue/React のフレームワーク思想の違いがメタフレームワークにも反映されている。
+          </div>
+        </div>
+      </details>
+    </section>
+  </section>
 </main>
+<script>
+  document.querySelectorAll('.tab-button').forEach((button) => {
+    button.addEventListener('click', () => {
+      const tabId = button.dataset.tab;
+      document.querySelectorAll('.tab-button').forEach((b) => {
+        b.classList.toggle('active', b === button);
+      });
+      document.querySelectorAll('.tab-panel').forEach((p) => {
+        p.classList.toggle('active', p.id === `tab-${tabId}`);
+      });
+    });
+  });
+</script>
 </body>
 </html>
