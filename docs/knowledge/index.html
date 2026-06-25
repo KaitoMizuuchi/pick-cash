@@ -1985,10 +1985,242 @@ const select = { id: true, ... } satisfies Prisma.TransactionSelect;</code></pre
     <nav class="toc">
       <h2>目次</h2>
       <ul>
+        <li><a href="#nuxt-setup">セットアップと初期構成</a></li>
         <li><a href="#nuxt-imports">ディレクトリ構成と自動インポート</a></li>
         <li><a href="#nuxt-rendering">レンダリングモデル</a></li>
       </ul>
     </nav>
+
+    <!-- ============================================ -->
+    <!-- カテゴリ: セットアップと初期構成 -->
+    <!-- ============================================ -->
+    <section class="category" id="nuxt-setup">
+      <h2>セットアップと初期構成</h2>
+      <p class="cat-desc">Nuxt プロジェクトの初期化、Nuxt 4 から導入された TypeScript Project References、pnpm のビルドスクリプト許可機構など、プロジェクト立ち上げ時に触れる仕組み。</p>
+
+      <!-- Q1 -->
+      <details class="qa">
+        <summary>Nuxt プロジェクトの初期化方法（nuxi init）と NestJS との対比</summary>
+        <div class="qa-body">
+          <p>Nuxt は公式 CLI <code>nuxi</code> でプロジェクトを生成するのが標準的。pick-cash の backend (NestJS) は手動で構築したが、Nuxt は CLI 推奨。</p>
+
+          <h4>NestJS と Nuxt の対比表</h4>
+          <table>
+            <thead><tr><th>プロジェクト</th><th>構築方法</th><th>理由</th></tr></thead>
+            <tbody>
+              <tr><td>NestJS（pick-cash）</td><td>手動構築</td><td>モノレポ最適化 + 学習目的で構造を理解したい意図</td></tr>
+              <tr><td>Nuxt（一般慣習）</td><td><code>nuxi init</code> CLI</td><td>設定ファイルが多く、テンプレが優秀</td></tr>
+            </tbody>
+          </table>
+
+          <p>NestJS と違って Nuxt は「設定ファイルの初期テンプレ」が学習の障害になるレベルで充実している:</p>
+          <ul>
+            <li><code>nuxt.config.ts</code>（Nuxt独自の設定）</li>
+            <li><code>app.vue</code>（ルートコンポーネント）</li>
+            <li><code>tsconfig.json</code>（Project References構成）</li>
+            <li><code>.gitignore</code>（<code>.nuxt/</code>, <code>.output/</code> 等の除外）</li>
+            <li><code>tsconfig.app.json</code> などのサブ tsconfig（Nuxt 4 から）</li>
+          </ul>
+          <p>これ全部手書きすると数時間溶ける + 細かい設定ミスでハマる。現場でも 100% CLI 使うので、CLI に乗っかる方が筋。</p>
+
+          <h4>nuxi init の基本コマンド（対話モード）</h4>
+<pre><code>npx nuxi@latest init apps/frontend</code></pre>
+          <p>対話プロンプト:</p>
+          <ul>
+            <li>パッケージマネージャ選択（pnpm）</li>
+            <li>git init するか（既存リポジトリならNo）</li>
+          </ul>
+
+          <h4>非対話モード（モノレポ向け推奨）</h4>
+          <p>CI やスクリプトから呼ぶときは非対話モードで:</p>
+<pre><code>npx nuxi@latest init apps/frontend \
+  --template minimal \
+  --packageManager pnpm \
+  --no-install \
+  --gitInit=false</code></pre>
+
+          <p>オプションの意味:</p>
+          <table>
+            <thead><tr><th>フラグ</th><th>効果</th></tr></thead>
+            <tbody>
+              <tr><td><code>--template minimal</code></td><td>Nuxt 4 minimal テンプレ（非対話モードでは必須）</td></tr>
+              <tr><td><code>--packageManager pnpm</code></td><td>pnpm 指定</td></tr>
+              <tr><td><code>--no-install</code></td><td>自動 install 抑止（モノレポではルートから install したいため）</td></tr>
+              <tr><td><code>--gitInit=false</code></td><td>git init しない</td></tr>
+            </tbody>
+          </table>
+          <p><code>--package-manager</code>（ケバブ）ではなく <code>--packageManager</code>（キャメル）が正解。CLIの仕様。</p>
+
+          <h4>生成されるテンプレ一覧（参考）</h4>
+          <p><code>nuxi init</code> の対話モードで選べるテンプレ:</p>
+          <ul>
+            <li><code>minimal</code> — Nuxt 4 minimal setup（pick-cash で採用）</li>
+            <li><code>content</code> — Content-driven website（ブログ等用）</li>
+            <li><code>module</code> — Nuxt module 開発用</li>
+            <li><code>ui</code> — Nuxt UI 込み（UI ライブラリを別途検討するならこちら）</li>
+            <li><code>v5-nightly</code> — Nuxt 5 開発版</li>
+          </ul>
+
+          <h4>生成された pick-cash のディレクトリ構造</h4>
+          <div class="ascii-art">apps/frontend/
+├── .gitignore                ← Nuxt用に最適化済み
+├── README.md
+├── app/                      ← Nuxt 4 のソースルート
+│   └── app.vue               ← ルートコンポーネント
+├── nuxt.config.ts            ← 設定（ここを後で編集）
+├── package.json              ← Nuxt関連の依存込み
+├── public/                   ← 静的ファイル
+└── tsconfig.json             ← Project References構成</div>
+
+          <h4>CLI 後にやること</h4>
+          <ol>
+            <li><code>package.json</code> の <code>name</code> を <code>@pick-cash/frontend</code> に変更（workspace 規約に揃える）</li>
+            <li>ルートから <code>pnpm install</code>（workspace 全体で依存解決 + postinstall で <code>nuxt prepare</code> 自動実行）</li>
+            <li><code>pnpm --filter @pick-cash/frontend dev</code> で起動確認</li>
+          </ol>
+
+          <div class="note">
+            モノレポでは <strong><code>--no-install</code> 必須</strong>。<code>nuxi</code> が単独で npm/pnpm を叩くと workspace の依存解決と整合性が崩れる可能性。ルートから <code>pnpm install</code> する流れに統一する。
+          </div>
+        </div>
+      </details>
+
+      <!-- Q2 -->
+      <details class="qa">
+        <summary>Nuxt 4 の <code>tsconfig.json</code> が Project References 構成なのはなぜ？</summary>
+        <div class="qa-body">
+          <p>Nuxt 4 で生成される <code>tsconfig.json</code> は中身がほぼ空（<code>files: []</code> と <code>references</code> のみ）。これは TypeScript の Project References 機能を活用した Nuxt 4 標準の構成。</p>
+
+          <h4>生成される tsconfig.json の中身</h4>
+<pre><code>{
+  "files": [],
+  "references": [
+    { "path": "./.nuxt/tsconfig.app.json" },
+    { "path": "./.nuxt/tsconfig.server.json" },
+    { "path": "./.nuxt/tsconfig.shared.json" },
+    { "path": "./.nuxt/tsconfig.node.json" }
+  ]
+}</code></pre>
+
+          <h4>実際の設定は <code>.nuxt/</code> 配下に自動生成される</h4>
+          <p><code>nuxt prepare</code>（postinstallで自動実行）が以下を生成:</p>
+          <div class="ascii-art">.nuxt/
+├── tsconfig.app.json       ← アプリ本体（app/配下）の型設定
+├── tsconfig.server.json    ← server/api/ 等のサーバーサイドコード
+├── tsconfig.shared.json    ← shared/ 配下（共有コード）
+└── tsconfig.node.json      ← nuxt.config.ts などのNode実行コード</div>
+
+          <p>各ファイルには動的に:</p>
+          <ul>
+            <li>自動インポートの型定義へのパス</li>
+            <li>Vue ファイルの型解決</li>
+            <li>module 拡張の型</li>
+            <li>paths / strict / types などの細かい設定</li>
+          </ul>
+          <p>が生成される。</p>
+
+          <h4>なぜ4つに分かれてる？</h4>
+          <p>ファイルが「どの環境で実行されるか」で <strong>型解決ルールが違うから</strong>:</p>
+          <table>
+            <thead><tr><th>ファイル</th><th>対象</th><th>型に含まれるもの</th></tr></thead>
+            <tbody>
+              <tr><td><code>tsconfig.app.json</code></td><td><code>app/</code> 配下（pages, components等）</td><td>Vue, ブラウザDOM, Nuxt自動インポート</td></tr>
+              <tr><td><code>tsconfig.server.json</code></td><td><code>server/api/</code> 配下</td><td>Node.js環境、Nitro、Server-only機能</td></tr>
+              <tr><td><code>tsconfig.shared.json</code></td><td><code>shared/</code> 配下（クライアントもサーバーも）</td><td>両方で使える共通APIのみ</td></tr>
+              <tr><td><code>tsconfig.node.json</code></td><td><code>nuxt.config.ts</code> 等</td><td>Node.js のビルド時実行コード</td></tr>
+            </tbody>
+          </table>
+
+          <p>例: <code>app/</code> のコンポーネントで <code>window.localStorage</code> を使いたい時は app の tsconfig が DOM 型を持っている必要があるが、<code>server/</code> には DOM 型は不要（むしろ使えるとバグの元）。実行環境ごとに型を分離している。</p>
+
+          <h4>カスタマイズしたい時</h4>
+          <p>ユーザーが直接いじる場所は基本的に <code>nuxt.config.ts</code> の <code>typescript</code> フィールド:</p>
+<pre><code>// nuxt.config.ts
+export default defineNuxtConfig({
+  typescript: {
+    strict: true,           // strict モード
+    typeCheck: true,        // 型チェック実行
+    tsConfig: {             // 追加の tsconfig 設定
+      compilerOptions: {
+        noImplicitAny: true,
+      },
+    },
+  },
+})</code></pre>
+          <p>この設定を読んで Nuxt が <code>.nuxt/tsconfig.*.json</code> を生成する。<strong>手書きの tsconfig.json は触らない</strong>。</p>
+
+          <h4>Nuxt 3 との違い</h4>
+          <table>
+            <thead><tr><th>Nuxt バージョン</th><th>tsconfig 構成</th></tr></thead>
+            <tbody>
+              <tr><td>Nuxt 3</td><td>シングル <code>tsconfig.json</code> + <code>extends: '.nuxt/tsconfig.json'</code></td></tr>
+              <tr><td>Nuxt 4</td><td>Project References（今の構成）</td></tr>
+            </tbody>
+          </table>
+          <p>Nuxt 4 で大きく変わった部分の一つ。</p>
+
+          <h4>よくある違和感ポイント</h4>
+          <ul>
+            <li>「<code>include</code> も <code>compilerOptions</code> も書いてないけど大丈夫？」 → 大丈夫。<code>references</code> 経由で <code>.nuxt/</code> 配下の tsconfig を見にいく。VSCode の TypeScript サーバーもこの参照を辿る。</li>
+            <li>「<code>.nuxt/</code> が <code>.gitignore</code> に入ってるけど tsconfig が参照してて大丈夫？」 → 大丈夫。<code>.nuxt/</code> は postinstall で必ず再生成されるのでコミット不要。クローン後の <code>pnpm install</code> で勝手に作られる。</li>
+          </ul>
+        </div>
+      </details>
+
+      <!-- Q3 -->
+      <details class="qa">
+        <summary>pnpm 11 の <code>allowBuilds</code> で Nuxt 依存のビルドスクリプトを許可する</summary>
+        <div class="qa-body">
+          <p>pnpm 11 はセキュリティ機構として、<code>postinstall</code> 等のビルドスクリプトを <strong>明示的に許可されたパッケージしか実行しない</strong> 挙動になっている。Nuxt の依存にはネイティブモジュールが含まれるため、<code>pnpm-workspace.yaml</code> で許可が必要。</p>
+
+          <h4>症状</h4>
+          <p><code>pnpm install</code> 後に以下の警告が出る:</p>
+<pre><code>[ERR_PNPM_IGNORED_BUILDS] Ignored build scripts: @parcel/watcher@2.5.6, esbuild@0.27.7, esbuild@0.28.1
+
+Run "pnpm approve-builds" to pick which dependencies should be allowed to run scripts.</code></pre>
+          <p>これらは Nuxt の dev / build に必要なネイティブビルドだが、自動実行されていない状態。</p>
+
+          <h4>解決方法</h4>
+          <p><code>pnpm-workspace.yaml</code> の <code>allowBuilds</code> セクションにパッケージを追加:</p>
+<pre><code># pnpm-workspace.yaml
+packages:
+  - "apps/*"
+  - "packages/*"
+
+allowBuilds:
+  "@nestjs/core": true
+  "@parcel/watcher": true
+  "@prisma/engines": true
+  "@swc/core": true
+  esbuild: true
+  prisma: true</code></pre>
+          <p>追加後に再度 <code>pnpm install</code> すると、該当パッケージの postinstall / install スクリプトが実行される。</p>
+
+          <h4>主要パッケージの役割</h4>
+          <table>
+            <thead><tr><th>パッケージ</th><th>役割</th></tr></thead>
+            <tbody>
+              <tr><td><code>@parcel/watcher</code></td><td>ファイル監視（Nuxt の dev モードのホットリロード）</td></tr>
+              <tr><td><code>esbuild</code></td><td>JS/TS の高速ビルド（Vite の内部、Nuxt 4 でも使われる）</td></tr>
+              <tr><td><code>@nestjs/core</code></td><td>NestJS 本体</td></tr>
+              <tr><td><code>@prisma/engines</code></td><td>Prisma のクエリエンジン（ネイティブバイナリ）</td></tr>
+              <tr><td><code>@swc/core</code></td><td>Rust 製の TS/JS コンパイラ</td></tr>
+              <tr><td><code>prisma</code></td><td>Prisma CLI</td></tr>
+            </tbody>
+          </table>
+
+          <h4>なぜ pnpm がこれをやる？</h4>
+          <p>サプライチェーン攻撃対策。悪意ある npm パッケージが <code>postinstall</code> でマシンに任意のコードを実行する事案が過去にあったため、pnpm は「許可リスト」方式に変更した。Nuxt / Prisma / Swc などは信頼できる公式パッケージなので明示許可してOK。</p>
+
+          <h4>別の許可方法（参考）</h4>
+          <p><code>pnpm approve-builds</code> コマンドで対話的に許可することも可能だが、リポジトリで共有する設定にはならない。チーム開発では <code>pnpm-workspace.yaml</code> に記述するのが筋。</p>
+
+          <div class="note">
+            新しい依存を追加して「Ignored build scripts」警告が出た場合、その都度 <code>pnpm-workspace.yaml</code> の <code>allowBuilds</code> に追加する習慣をつける。pick-cash では <code>@parcel/watcher</code> と <code>esbuild</code> を Nuxt 導入時に追加した。
+          </div>
+        </div>
+      </details>
+    </section>
 
     <!-- ============================================ -->
     <!-- カテゴリ: ディレクトリ構成と自動インポート -->
