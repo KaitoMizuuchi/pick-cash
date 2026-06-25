@@ -5,6 +5,8 @@ packages:
 # postinstall などのビルドスクリプト実行を明示的に許可するパッケージ
 allowBuilds:
   "@nestjs/core": true
+  "@parcel/watcher": true
   "@prisma/engines": true
   "@swc/core": true
+  esbuild: true
   "prisma": true
