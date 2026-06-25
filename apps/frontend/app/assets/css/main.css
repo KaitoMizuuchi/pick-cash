@@ -1,0 +1,12 @@
+/*
+ * Tailwind CSS v4 のエントリ。
+ * `@import "tailwindcss"` だけで preflight + utilities が読み込まれる。
+ * v3 の `@tailwind base; @tailwind components; @tailwind utilities;` の代替。
+ *
+ * カスタムテーマを追加したい場合は @theme ブロックで CSS 変数として定義する。
+ * 例:
+ *   @theme {
+ *     --color-primary: oklch(0.7 0.2 250);
+ *   }
+ */
+@import "tailwindcss";

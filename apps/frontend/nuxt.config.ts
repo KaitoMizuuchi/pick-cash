@@ -1,7 +1,19 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
+import tailwindcss from '@tailwindcss/vite'
+
 export default defineNuxtConfig({
   compatibilityDate: '2025-07-15',
   devtools: { enabled: true },
+
+  // Tailwind CSS v4 のエントリCSSを全ページに適用。
+  // @import "tailwindcss" を含むファイルを Nuxt 全体の CSS として読み込む。
+  css: ['~/assets/css/main.css'],
+
+  // Tailwind v4 は Vite プラグインとして動かすのが公式推奨。
+  // postcss を経由せず、Vite が直接 utility クラスを解析・生成する。
+  vite: {
+    plugins: [tailwindcss()],
+  },
 
   // 個人の収支管理アプリは認証必須・SEO不要・公開ページなしのため SPA で動かす。
   // すべてクライアント側で描画され、サーバーは空のHTMLを返すだけになる。
