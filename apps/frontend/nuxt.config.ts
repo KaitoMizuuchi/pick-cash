@@ -18,4 +18,19 @@ export default defineNuxtConfig({
       apiBase: 'http://localhost:3001',
     },
   },
+
+  // 機能モジュールを縦割りで管理するため、features/ 配下の components / composables も
+  // 自動インポート対象に含める。デフォルトの ~/components / ~/composables も維持する。
+  // pathPrefix: false でディレクトリ名がコンポーネント名にprefixされないようにする
+  // （例: features/transactions/components/TransactionList.vue → <TransactionList /> として利用可能）。
+  components: [
+    { path: '~/components', pathPrefix: false },
+    { path: '~/features', pathPrefix: false },
+  ],
+  imports: {
+    dirs: [
+      'composables/**',
+      'features/**/composables',
+    ],
+  },
 })
