@@ -1,12 +1,10 @@
 /*
- * Tailwind CSS v4 のエントリ。
- * `@import "tailwindcss"` だけで preflight + utilities が読み込まれる。
- * v3 の `@tailwind base; @tailwind components; @tailwind utilities;` の代替。
+ * Nuxt UI v4 + Tailwind CSS v4 のエントリ。
+ * - "tailwindcss" で preflight + utilities を読み込み
+ * - "@nuxt/ui" で Nuxt UI のスタイルと CSS 変数（--ui-primary 等）を読み込む
  *
  * カスタムテーマを追加したい場合は @theme ブロックで CSS 変数として定義する。
- * 例:
- *   @theme {
- *     --color-primary: oklch(0.7 0.2 250);
- *   }
+ * primary color の指定は app.config.ts の ui.colors.primary で行う。
  */
 @import "tailwindcss";
+@import "@nuxt/ui";
