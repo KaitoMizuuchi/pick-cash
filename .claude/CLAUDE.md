@@ -103,12 +103,16 @@ Controller / Service / Repository の全層で同じメソッド名を使う（N
 - 詳細なエラーは `console.error` に出力する
 - HTTPレスポンスは汎用的なメッセージとステータスコードのみ返す
 - 例外はGlobalExceptionFilterで一元処理する
+- `DEFAULT_MESSAGES` のメッセージは frontend がそのままユーザーに表示する想定で、最初から日本語で定義する
 - catchで握りつぶさない（空catch禁止）
 
 ### フロントエンド
 
 - APIエラーは握りつぶさず、UI（トースト等）でユーザーに通知する
-- 詳細はコンソールに出力する
+- 表示メッセージは backend が返す `message` をそのまま使う（二重管理を避けるため、ステータス別の文言を frontend で持たない）
+- ネットワーク到達失敗（`FetchError` ではない catch）のときだけ frontend 固有の固定メッセージ（「サーバーに接続できませんでした」）を使う
+- 明示的な `console.error` は書かない（`$fetch` のエラーは Nuxt/ofetch が自動でブラウザコンソールに出力するため）
+- API エラーの description 生成は `app/utils/apiError.ts` の `getErrorDescription` に集約する
 
 ## コメント
 

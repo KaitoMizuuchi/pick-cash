@@ -24,6 +24,10 @@ type TransactionsResponse = {
 
 export const useTransactions = () => {
   const config = useRuntimeConfig();
+  // Nuxt UI v4 が提供する useToast() を利用する。<UApp> がトースト表示器を内蔵しているため
+  // 自前で Container を置く必要はない。await 後の context 外し対策として composable の
+  // トップで取得しておく。
+  const toast = useToast();
   const transactions = ref<TransactionListItem[]>([]);
   const isLoading = ref(false);
   const error = ref<Error | null>(null);
@@ -40,8 +44,15 @@ export const useTransactions = () => {
       transactions.value = response.data;
     } catch (e) {
       // $fetch は 4xx/5xx で reject するため、ここに HTTP エラーと通信失敗の両方が来る。
-      // 詳細は呼び出し側がエラー UI（トースト等）で扱う。
+      // 表示メッセージは getErrorDescription (utils/apiError.ts) に委譲。
+      // backend の汎用文言を再利用し、フロント側でステータス別の分岐は持たない（二重管理回避）。
       error.value = e instanceof Error ? e : new Error(String(e));
+      toast.add({
+        title: '取得に失敗しました',
+        description: getErrorDescription(e),
+        color: 'error',
+        icon: 'i-lucide-circle-x',
+      });
     } finally {
       isLoading.value = false;
     }

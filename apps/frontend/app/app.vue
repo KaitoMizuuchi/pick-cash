@@ -7,5 +7,6 @@
   <UApp>
     <NuxtRouteAnnouncer />
     <NuxtPage />
+    <!-- トースト表示器は <UApp> が内蔵で提供する。useToast() で通知を積めば自動で右上に出る。 -->
   </UApp>
 </template>

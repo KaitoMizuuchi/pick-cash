@@ -37,7 +37,7 @@ describe('GlobalExceptionFilter', () => {
     filter.catch(new NotFoundException('内部の詳細'), createHost(response));
 
     expect(response.status).toHaveBeenCalledWith(HttpStatus.NOT_FOUND);
-    expect(response.json).toHaveBeenCalledWith({ message: 'Not Found' });
+    expect(response.json).toHaveBeenCalledWith({ message: 'データが見つかりませんでした。' });
   });
 
   it('未定義ステータスのHttpExceptionは500扱いの汎用メッセージで返す', () => {
@@ -46,7 +46,9 @@ describe('GlobalExceptionFilter', () => {
     filter.catch(new HttpException('teapot', 418), createHost(response));
 
     expect(response.status).toHaveBeenCalledWith(418);
-    expect(response.json).toHaveBeenCalledWith({ message: 'Internal Server Error' });
+    expect(response.json).toHaveBeenCalledWith({
+      message: 'サーバーで問題が発生しました。時間をおいて再度お試しください。',
+    });
   });
 
   it('HttpException以外の例外は500 + Internal Server Errorで返す', () => {
@@ -54,7 +56,9 @@ describe('GlobalExceptionFilter', () => {
     filter.catch(new Error('想定外の例外'), createHost(response));
 
     expect(response.status).toHaveBeenCalledWith(HttpStatus.INTERNAL_SERVER_ERROR);
-    expect(response.json).toHaveBeenCalledWith({ message: 'Internal Server Error' });
+    expect(response.json).toHaveBeenCalledWith({
+      message: 'サーバーで問題が発生しました。時間をおいて再度お試しください。',
+    });
   });
 
   it('例外の詳細はconsole.errorに出力される', () => {
