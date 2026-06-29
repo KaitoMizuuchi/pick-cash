@@ -7,7 +7,9 @@
     "dev": "nuxt dev",
     "generate": "nuxt generate",
     "preview": "nuxt preview",
-    "postinstall": "nuxt prepare"
+    "postinstall": "nuxt prepare",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@pick-cash/shared": "workspace:*",
@@ -15,10 +17,15 @@
     "@vee-validate/zod": "^4.15.1",
     "nuxt": "^4.4.8",
     "vue": "^3.5.38",
-    "vue-router": "^5.1.0"
+    "vue-router": "^5.1.0",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@nuxt/test-utils": "^4.0.3",
     "@tailwindcss/vite": "^4.3.1",
-    "tailwindcss": "^4.3.1"
+    "@vue/test-utils": "^2.4.11",
+    "happy-dom": "^20.10.6",
+    "tailwindcss": "^4.3.1",
+    "vitest": "^4.1.8"
   }
 }
