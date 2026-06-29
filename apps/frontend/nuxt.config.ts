@@ -5,6 +5,12 @@ export default defineNuxtConfig({
   compatibilityDate: '2025-07-15',
   devtools: { enabled: true },
 
+  // VeeValidate を Nuxt モジュール経由で導入。
+  // <Form> / <Field> / <ErrorMessage> 等のコンポーネントと、
+  // useForm / useField 等の composable が自動インポート対象になる。
+  // shared の Zod スキーマは @vee-validate/zod の toTypedSchema() で包んで使う。
+  modules: ['@vee-validate/nuxt'],
+
   // Tailwind CSS v4 のエントリCSSを全ページに適用。
   // @import "tailwindcss" を含むファイルを Nuxt 全体の CSS として読み込む。
   css: ['~/assets/css/main.css'],

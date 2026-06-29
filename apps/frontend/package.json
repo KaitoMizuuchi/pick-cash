@@ -11,6 +11,8 @@
   },
   "dependencies": {
     "@pick-cash/shared": "workspace:*",
+    "@vee-validate/nuxt": "^4.15.1",
+    "@vee-validate/zod": "^4.15.1",
     "nuxt": "^4.4.8",
     "vue": "^3.5.38",
     "vue-router": "^5.1.0"
