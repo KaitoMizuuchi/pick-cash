@@ -1,8 +1,9 @@
 <script setup lang="ts">
 // 一覧画面のエントリポイント。
 // composable から状態と取得関数を受け取り、マウント時に取得を発火する。
-// error はトーストで通知するため pages 側では受け取らない（useTransactions 内で処理済み）。
-const { transactions, isLoading, fetchAll } = useTransactions()
+// 取得失敗の詳細通知はトーストで行うが、リストの空状態文言を切り替えるため error も
+// 受け取って TransactionList に渡す。
+const { transactions, isLoading, error, fetchAll } = useTransactions()
 
 // React の useEffect(() => { fetchAll() }, []) と同じ役割。
 // ページがマウントされたタイミングで一度だけ一覧を取得する。
@@ -32,8 +33,8 @@ onMounted(() => {
     </div>
 
     <!-- 一覧: features/transactions/components/TransactionList.vue が自動 import される。
-         取得失敗時は useTransactions 側で toast.error が呼ばれるため、ここではエラー UI を
-         書かなくて良い。エラー時も「0件 (—)」のフォールバック表示になる。 -->
-    <TransactionList v-else :transactions="transactions" />
+         取得失敗時の詳細通知はトーストに任せ、ここでは error を渡して空状態の文言だけ
+         切り替える（「取引がまだ登録されていません」⇔「エラーが発生しました」）。 -->
+    <TransactionList v-else :transactions="transactions" :error="error" />
   </div>
 </template>

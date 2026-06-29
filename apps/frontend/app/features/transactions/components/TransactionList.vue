@@ -3,8 +3,11 @@ import type { TransactionListItem } from '../composables/useTransactions'
 
 // formatDate / formatAmount は app/utils/format.ts に切り出してあり、
 // Nuxt の自動インポート対象（imports.dirs に utils が含まれる）なので import 不要で使える。
+// error は親で取得失敗を受け取って渡してもらう。空表示の文言を「取得失敗」と「データ無し」で
+// 切り替えるため。値の中身までは使わず、有無だけを表示判定に使う。
 defineProps<{
   transactions: TransactionListItem[]
+  error?: Error | null
 }>()
 </script>
 
@@ -51,12 +54,14 @@ defineProps<{
       </div>
     </li>
 
-    <!-- 空状態: リストが空でも枠だけ残る形にして、画面が崩れないようにする -->
+    <!-- 空状態: リストが空でも枠だけ残る形にして、画面が崩れないようにする。
+         取得が失敗した場合（error あり）と本当に0件の場合で文言を切り替える。
+         取得失敗時の詳細はトースト側に出るため、ここでは短い文言にとどめる。 -->
     <li
       v-if="transactions.length === 0"
       class="px-4 py-10 text-center text-sm text-slate-500"
     >
-      取引がまだ登録されていません
+      {{ error ? 'エラーが発生しました' : '取引がまだ登録されていません' }}
     </li>
   </ul>
 </template>
