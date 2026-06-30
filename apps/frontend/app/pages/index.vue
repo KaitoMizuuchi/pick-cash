@@ -3,13 +3,15 @@
 // composable から状態と取得関数を受け取り、マウント時に取得を発火する。
 // 取得失敗の詳細通知はトーストで行うが、リストの空状態文言を切り替えるため error も
 // 受け取って TransactionList に渡す。
-const { transactions, isLoading, error, fetchAll } = useTransactions()
+const { transactions, isLoading, error, fetchAll } = useTransactions();
 
 // React の useEffect(() => { fetchAll() }, []) と同じ役割。
 // ページがマウントされたタイミングで一度だけ一覧を取得する。
 onMounted(() => {
-  fetchAll()
-})
+  fetchAll();
+});
+
+const isCreateModalOpen = ref(false);
 </script>
 
 <template>
@@ -19,9 +21,12 @@ onMounted(() => {
         <h1 class="text-2xl font-semibold tracking-tight text-slate-900">取引履歴</h1>
         <p class="mt-1 text-xs text-slate-500">backend から取得した取引を時系列で表示します</p>
       </div>
-      <span class="font-mono text-xs text-slate-500 tabular-nums">
-        {{ transactions.length }}件
-      </span>
+      <div class="flex items-center gap-3">
+        <span class="font-mono text-xs text-slate-500 tabular-nums">
+          {{ transactions.length }}件
+        </span>
+        <UButton label="新規登録" icon="i-lucide-plus" @click="isCreateModalOpen = true" />
+      </div>
     </header>
 
     <!-- ローディング: 取得中は枠だけ表示してレイアウト崩れを避ける -->
@@ -36,5 +41,7 @@ onMounted(() => {
          取得失敗時の詳細通知はトーストに任せ、ここでは error を渡して空状態の文言だけ
          切り替える（「取引がまだ登録されていません」⇔「エラーが発生しました」）。 -->
     <TransactionList v-else :transactions="transactions" :error="error" />
+
+    <TransactionCreateModal v-model:open="isCreateModalOpen" />
   </div>
 </template>

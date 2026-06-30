@@ -142,6 +142,12 @@ Controller / Service / Repository の全層で同じメソッド名を使う（N
 - フロントエンドのAPI呼び出しは `composables/` に集約する
 - 共通のリクエスト/レスポンス型は `packages/shared` のZodスキーマから導出する
 
+## フォームバリデーション
+
+- Nuxt UI の `<UForm>` に Zod スキーマを直接渡してバリデーションする（`schema` prop）
+- VeeValidate の `toTypedSchema()` は使わない（UForm が Zod をネイティブサポートしているため）
+- バリデーションスキーマは `packages/shared` のものを再利用する
+
 # 全体方針
 
 - 推測で実装を進めず、不明点はユーザーに確認する

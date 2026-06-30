@@ -59,10 +59,16 @@
 ゴール: モーダルで新規取引を追加できる。
 
 - [ ] モーダルコンポーネント
-- [ ] フォーム（VeeValidate + sharedのZodスキーマ）
-- [ ] POST後に一覧を再取得 or 楽観的更新
+- [ ] フォーム（UForm + sharedのZodスキーマ）
+- [ ] POST後に楽観的更新
 
 動作確認: 登録した取引が一覧に反映される。
+
+### 解決済み
+
+- shared パッケージの CJS/ESM 問題: exports に `"import": "./src/index.ts"` を追加し、Vite にはソース TypeScript を、backend には CJS dist を返す方式で解決
+- backend の DI エラー: Biome の `useImportType` ルールが DI 対象クラスの import を `import type` に書き換えていた → backend 向けに無効化が必要（対応中）
+- 登録モーダルの動作確認: 表示・登録ともに動作確認済み
 
 ---
 
