@@ -2906,6 +2906,132 @@ watch(open, (isOpen) =&gt; {
           </div>
         </div>
       </details>
+
+      <!-- Q10 -->
+      <details class="qa">
+        <summary><code>defineEmits</code> とは？ React の props コールバックとの違い</summary>
+        <div class="qa-body">
+          <p>Vue の <code>defineEmits</code> は子コンポーネントから親へイベントを通知する仕組み。React の「コールバック props」と<strong>結果的にやっていることは同じ（子→親のデータ伝達）</strong>だが、仕組みの方向が逆。</p>
+
+          <h4>React と Vue の思想の違い</h4>
+          <table>
+            <thead><tr><th></th><th>React</th><th>Vue</th></tr></thead>
+            <tbody>
+              <tr><td>方向</td><td>トップダウン（親→子に関数を渡す）</td><td>ボトムアップ（子がイベントを宣言して親がリスナーで受け取る）</td></tr>
+              <tr><td>親の書き方</td><td><code>&lt;List onEdit={handleEdit} /&gt;</code></td><td><code>&lt;List @edit="openEditModal" /&gt;</code></td></tr>
+              <tr><td>子の書き方</td><td><code>props.onEdit(tx)</code></td><td><code>emit('edit', tx)</code></td></tr>
+            </tbody>
+          </table>
+
+          <h4>Vue のコード例（子コンポーネント）</h4>
+<pre><code>// 子コンポーネント
+const emit = defineEmits&lt;{
+  edit: [transaction: TransactionListItem]
+  delete: [transaction: TransactionListItem]
+}&gt;()
+
+emit('edit', tx)  // → 親の openEditModal(tx) が呼ばれる</code></pre>
+
+          <h4>Vue の親側</h4>
+<pre><code>&lt;TransactionList @edit="openEditModal" @delete="openDeleteModal" /&gt;</code></pre>
+
+          <h4>React 相当のコード</h4>
+<pre><code>// 親
+&lt;TransactionList onEdit={handleEdit} onDelete={handleDelete} /&gt;
+// 子
+props.onEdit(tx)</code></pre>
+
+          <h4><code>defineEmits</code> の型定義の読み方</h4>
+          <p>型引数のオブジェクト内で、各プロパティがイベント名、値のタプル型がイベントの引数型を表す:</p>
+<pre><code>defineEmits&lt;{
+  edit: [transaction: TransactionListItem]
+  //     ↑ イベント名     ↑ 引数の型（タプル型）
+  delete: [transaction: TransactionListItem]
+}&gt;()</code></pre>
+          <p>タプル型 <code>[transaction: TransactionListItem]</code> は「引数が1つで、型は <code>TransactionListItem</code>」を意味する。引数が複数あれば <code>[id: string, name: string]</code> のように並べる。</p>
+
+          <h4>仕組みの違いを図にすると</h4>
+          <div class="ascii-art">React（トップダウン）:
+  親 → 子に関数を渡す
+  親: &lt;List onEdit={handleEdit} /&gt;
+  子: props.onEdit(tx)  ← 親が渡した関数を直接呼ぶ
+
+Vue（ボトムアップ）:
+  子 → 親にイベントを発火する
+  子: emit('edit', tx)  ← イベントを発火
+  親: @edit="openEditModal"  ← リスナーで受け取る</div>
+
+          <div class="note">
+            <strong>覚え方:</strong> React は「親が関数を渡して子が呼ぶ」、Vue は「子がイベントを発火して親が受け取る」。やっていることは同じ（子→親のデータ伝達）だが、責務の起点が逆。Vue の方が「子は親の実装を知らない」という疎結合寄りの設計思想。
+          </div>
+        </div>
+      </details>
+
+      <!-- Q11 -->
+      <details class="qa">
+        <summary><code>@update:model-value</code> と <code>watch</code> の使い分け（初期化時の発火問題）</summary>
+        <div class="qa-body">
+          <p><code>v-model</code> と連動した値変更を検知するには <code>watch</code> と <code>@update:model-value</code> の2つの方法がある。編集モーダルのように<strong>「プログラムの初期化」と「ユーザー操作」を区別したい場面</strong>では、<code>@update:model-value</code> の方が安全。</p>
+
+          <h4>前提: <code>v-model</code> の正体</h4>
+          <p><code>v-model="state.type"</code> は以下の省略形:</p>
+<pre><code>&lt;!-- v-model の省略前 --&gt;
+&lt;URadioGroup
+  :model-value="state.type"
+  @update:model-value="(val) =&gt; state.type = val"
+/&gt;
+
+&lt;!-- v-model の省略後（同じ意味） --&gt;
+&lt;URadioGroup v-model="state.type" /&gt;</code></pre>
+          <p>つまり <code>v-model</code> に加えて <code>@update:model-value</code> を書くと、v-model の更新と同時に追加処理を実行できる。</p>
+
+          <h4>問題: <code>watch</code> だと初期化でも発火する</h4>
+          <p>編集モーダルを開くとき、既存データで <code>Object.assign</code> してフォームを初期化する。このとき <code>state.type</code> が変わると <code>watch</code> が反応してしまう:</p>
+<pre><code>// watch だと初期化で発火してバグる
+watch(() =&gt; state.type, () =&gt; {
+  state.categoryId = ''  // ← 編集モーダルの初期化でも実行されてしまう
+  fetchCategories(state.type)
+})</code></pre>
+
+          <h4>タイムラインで見ると</h4>
+          <div class="ascii-art">編集モーダルを開く:
+  Object.assign → state.type = 'income', state.categoryId = 'abc123'
+
+  watch の場合:
+    state.type が変わった！ → categoryId = '' （値が消える）
+
+  @update:model-value の場合:
+    プログラムでの変更 → 何も起きない
+    ユーザーがラジオを切り替えた → categoryId = ''</div>
+
+          <h4>解決: <code>@update:model-value</code> を使う</h4>
+          <p><code>@update:model-value</code> は<strong>ユーザー操作（UIコンポーネントからの emit）でしか発火しない</strong>ため、プログラムでの値変更に巻き込まれない:</p>
+<pre><code>&lt;!-- @update:model-value ならユーザー操作のみ --&gt;
+&lt;URadioGroup
+  v-model="state.type"
+  @update:model-value="onTypeChange"
+/&gt;</code></pre>
+
+<pre><code>const onTypeChange = (newType: TransactionType) =&gt; {
+  state.categoryId = ''
+  fetchCategories(newType)
+}</code></pre>
+
+          <h4>使い分けの判断基準</h4>
+          <table>
+            <thead><tr><th>場面</th><th>使うべき方法</th><th>理由</th></tr></thead>
+            <tbody>
+              <tr><td>プログラムの初期化でも反応してほしい</td><td><code>watch</code></td><td>値の変更元を区別しない</td></tr>
+              <tr><td>ユーザー操作のときだけ反応したい</td><td><code>@update:model-value</code></td><td>UI からの emit でしか発火しない</td></tr>
+              <tr><td>編集モーダルの初期化がある</td><td><code>@update:model-value</code></td><td>Object.assign での初期化に巻き込まれない</td></tr>
+            </tbody>
+          </table>
+
+          <div class="note">
+            <strong>覚え方:</strong> <code>watch</code> は「値が変わったら無条件に発火」、<code>@update:model-value</code> は「UIコンポーネントが emit したときだけ発火」。「プログラムの初期化」と「ユーザー操作」を区別したい場面ではイベントハンドラの方が安全。
+          </div>
+        </div>
+      </details>
     </section>
 
     <!-- ============================================ -->
@@ -3030,6 +3156,142 @@ export const useAuth = () =&gt; {
 
           <div class="note">
             React 経験者は「カスタムフック」のメンタルモデルをそのまま composable に当てはめれば OK。「アプリ全体で共有する状態が出てきたら Pinia を検討」という判断軸も Redux/Zustand を入れるタイミングと同じ。
+          </div>
+        </div>
+      </details>
+
+      <!-- Q2 -->
+      <details class="qa">
+        <summary>モジュールスコープ <code>ref</code> による状態共有 — Vue の楽観的更新パターン</summary>
+        <div class="qa-body">
+          <p>Vue の <code>ref()</code> はコンポーネントに依存しない独立したリアクティブな箱。モジュールスコープ（関数の外）に置いても、それを読んでいるコンポーネントが自動追跡・再描画される。React とは根本的に仕組みが違う。</p>
+
+          <h4>React との根本的な違い</h4>
+          <table>
+            <thead><tr><th></th><th>React (<code>useState</code>)</th><th>Vue (<code>ref</code>)</th></tr></thead>
+            <tbody>
+              <tr><td>状態の所属</td><td>コンポーネントのファイバーノードに紐づく</td><td>どこにでも置ける独立した箱</td></tr>
+              <tr><td>コンポーネント外で使える？</td><td><span class="cross">×</span> 使えない</td><td><span class="check">○</span> 使える</td></tr>
+              <tr><td>共有するには</td><td>Context / Redux / Zustand が必要</td><td>モジュールスコープに置くだけ</td></tr>
+            </tbody>
+          </table>
+
+          <h4>問題: ref を関数内に定義すると React と同じ問題が起きる</h4>
+          <div class="ascii-art">useTransactions() を2箇所から呼ぶと:
+
+index.vue:     useTransactions() → ref A（10件入り）
+FormModal:     useTransactions() → ref B（空の []）
+
+create() → ref B に unshift → ref A は変わらない
+一覧は更新されない</div>
+
+          <h4>解決: ref をモジュールスコープに定義する</h4>
+          <div class="ascii-art">const _transactions = ref([])  ← ファイルに1つだけ
+
+index.vue:     useTransactions() → _transactions を参照
+FormModal:     useTransactions() → 同じ _transactions を参照
+
+create() → _transactions に unshift → 両方に即反映</div>
+
+          <p>モジュールスコープの <code>ref</code> はファイルごとに1つだけ存在するので、どこから <code>useTransactions()</code> を呼んでも同じ参照を得る。</p>
+
+          <h4>なぜ Vue ではこれが可能なのか</h4>
+          <p>Vue の <code>ref()</code> は Proxy ベースのリアクティブな箱であり、コンポーネントのライフサイクルに依存しない。テンプレートや <code>computed</code> がその <code>ref</code> を読んだ瞬間に Vue が依存関係を自動追跡し、値が変わったら再描画する。だからモジュールスコープに置いても正しく動く。</p>
+
+          <h4>モジュールスコープを使わない場合の代替手段</h4>
+          <table>
+            <thead><tr><th>方法</th><th>やり方</th><th>デメリット</th></tr></thead>
+            <tbody>
+              <tr><td>方法1: emit で再取得</td><td><code>emit('created')</code> → 親が <code>fetchAll()</code></td><td>ネットワークコスト（毎回 API を叩く）</td></tr>
+              <tr><td>方法2: emit で手動追加</td><td><code>emit('created', newTx)</code> → 親が手動で unshift</td><td>同期の手間（親がリスト操作を書く）</td></tr>
+              <tr><td>方法3: Pinia / provide-inject</td><td>グローバルストアで共有</td><td>この規模では大げさ</td></tr>
+            </tbody>
+          </table>
+
+          <p>モジュールスコープ <code>ref</code> なら、これらの手間なしに「composable を呼ぶだけで同じ状態を共有」できる。</p>
+
+          <h4>React で同じことをするには</h4>
+<pre><code>// React: コンポーネント外で状態を共有するには外部ライブラリが必要
+// Zustand の例
+const useTransactionStore = create((set) =&gt; ({
+  transactions: [],
+  addTransaction: (tx) =&gt; set((s) =&gt; ({
+    transactions: [tx, ...s.transactions]
+  })),
+}))
+
+// Vue: ref をモジュールスコープに置くだけ
+const _transactions = ref&lt;TransactionListItem[]&gt;([])
+
+export const useTransactions = () =&gt; {
+  const create = async (data: CreateInput) =&gt; {
+    const created = await $fetch('/api/transactions', { method: 'POST', body: data })
+    _transactions.value.unshift(created)  // ← 全コンポーネントに即反映
+  }
+  return { transactions: _transactions, create }
+}</code></pre>
+
+          <div class="note">
+            <strong>覚え方:</strong> Vue の <code>ref</code> はコンポーネントから独立した「リアクティブな箱」。モジュールスコープに置けば、どのコンポーネントから読んでも同じ箱を参照し、変更が全箇所に伝播する。React の <code>useState</code> はコンポーネントに紐づくので、この手法は使えない。
+          </div>
+        </div>
+      </details>
+
+      <!-- Q3 -->
+      <details class="qa">
+        <summary>Pinia の必要性 — いつモジュールスコープ <code>ref</code> では足りなくなるか</summary>
+        <div class="qa-body">
+          <p>モジュールスコープ <code>ref</code> は SPA では十分機能するが、SSR や大規模開発では限界がある。「いつ Pinia に移行すべきか」の判断基準を整理する。</p>
+
+          <h4>SPA ではモジュールスコープ ref で十分な理由</h4>
+          <p>SPA（<code>ssr: false</code>）ではブラウザに1つのアプリインスタンスしか存在しない。モジュールスコープの変数はそのインスタンス内で共有されるため、グローバルな状態管理として問題なく機能する。</p>
+
+          <h4>SSR でモジュールスコープ ref が危険な理由</h4>
+          <p>SSR ではサーバーが複数ユーザーのリクエストを処理する。モジュールスコープの変数はサーバープロセスで<strong>全ユーザーに共有されてしまう</strong>:</p>
+          <div class="ascii-art">SPA（今のアプリ）:
+  ブラウザ1つ → アプリ1つ → モジュールスコープ ref 1つ
+  → ユーザーAの状態だけ。問題なし。
+
+SSR:
+  サーバー1つ → モジュールスコープ ref 1つ
+  → ユーザーAのリクエスト: _transactions に10件入れる
+  → ユーザーBのリクエスト: _transactions を読む → Aの10件が見える！
+  → 状態がリークする</div>
+
+          <p>Pinia は Nuxt の SSR 環境でリクエストごとに独立したストアインスタンスを作る仕組みを持っているため、この問題が起きない。</p>
+
+          <h4>Pinia が必要になるタイミング</h4>
+          <table>
+            <thead><tr><th>状況</th><th>モジュールスコープ ref</th><th>Pinia</th></tr></thead>
+            <tbody>
+              <tr><td>SPA（ssr: false）</td><td><span class="check">○</span> 十分</td><td>不要</td></tr>
+              <tr><td>SSR（ssr: true）</td><td><span class="cross">×</span> 状態リーク</td><td><span class="check">○</span> 必要</td></tr>
+              <tr><td>ストア同士の依存がある</td><td>△ 手動管理</td><td><span class="check">○</span> ストア間参照が楽</td></tr>
+              <tr><td>DevTools で状態を追跡したい</td><td><span class="cross">×</span> 見えない</td><td><span class="check">○</span> Pinia タブで一覧</td></tr>
+              <tr><td>プラグイン・永続化が必要</td><td><span class="cross">×</span> 自前実装</td><td><span class="check">○</span> プラグインで対応</td></tr>
+            </tbody>
+          </table>
+
+          <h4>React の段階的移行との対応</h4>
+          <div class="ascii-art">React:
+  useState → useContext → Redux / Zustand
+
+Vue:
+  ref（ローカル） → モジュールスコープ ref（SPA共有） → Pinia（SSR / 大規模）</div>
+          <p>どちらも「必要になったタイミングで次のステップに進む」という段階的なアプローチが推奨。最初から大きな状態管理ライブラリを入れる必要はない。</p>
+
+          <h4>pick-cash の現状と今後</h4>
+          <div class="ascii-art">現状:
+  SPA モード（ssr: false）
+  モジュールスコープ ref で十分
+  → シンプル、追加の依存なし
+
+将来 SSR に切り替えたら:
+  Pinia で整理
+  → DevTools で状態追跡、リクエストごとに独立、プラグイン対応</div>
+
+          <div class="note">
+            <strong>覚え方:</strong> SPA ならモジュールスコープ <code>ref</code> で十分。SSR にするか、DevTools での状態追跡が欲しくなったら Pinia を導入する。React の useState → Context → Redux/Zustand と同じ段階的移行の考え方。
           </div>
         </div>
       </details>
