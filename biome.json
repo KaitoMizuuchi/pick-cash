@@ -90,6 +90,9 @@
                 "allow": ["error"]
               }
             }
+          },
+          "style": {
+            "useImportType": "off"
           }
         }
       }

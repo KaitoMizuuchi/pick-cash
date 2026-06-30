@@ -1,10 +1,7 @@
-import { Injectable } from "@nestjs/common";
-import { PrismaService } from "../../prisma/prisma.service";
-import { Prisma } from "../../generated/prisma/client";
-import {
-  CreateTransactionInput,
-  UpdateTransactionInput,
-} from "@pick-cash/shared";
+import { Injectable } from '@nestjs/common';
+import type { CreateTransactionInput, UpdateTransactionInput } from '@pick-cash/shared';
+import type { Prisma } from '../../generated/prisma/client';
+import { PrismaService } from '../../prisma/prisma.service';
 
 // カテゴリーとユーザーはともにnameだけ返す。idはmapのkeyで使用する。
 const transactionSelect = {
@@ -43,7 +40,7 @@ export class TransactionsRepository {
       select: transactionSelect,
 
       orderBy: {
-        date: "desc",
+        date: 'desc',
       },
     });
   }

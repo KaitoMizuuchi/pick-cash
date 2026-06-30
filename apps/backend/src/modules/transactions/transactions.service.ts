@@ -1,9 +1,6 @@
-import { Injectable } from "@nestjs/common";
-import { TransactionsRepository } from "./transactions.repository";
-import {
-  CreateTransactionInput,
-  UpdateTransactionInput,
-} from "@pick-cash/shared";
+import { Injectable } from '@nestjs/common';
+import type { CreateTransactionInput, UpdateTransactionInput } from '@pick-cash/shared';
+import { TransactionsRepository } from './transactions.repository';
 
 @Injectable()
 export class TransactionsService {
