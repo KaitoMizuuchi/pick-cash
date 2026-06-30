@@ -1,12 +1,22 @@
-import { type MiddlewareConsumer, Module, type NestModule } from '@nestjs/common';
-import { AppController } from './app.controller';
-import { AuthMiddleware } from './common/middlewares/auth.middleware';
-import { CategoriesModule } from './modules/categories/categories.module';
-import { TransactionsModule } from './modules/transactions/transactions.module';
-import { PrismaModule } from './prisma/prisma.module';
+import {
+  type MiddlewareConsumer,
+  Module,
+  type NestModule,
+} from "@nestjs/common";
+import { AppController } from "./app.controller";
+import { AuthMiddleware } from "./common/middlewares/auth.middleware";
+import { CategoriesModule } from "./modules/categories/categories.module";
+import { TransactionsModule } from "./modules/transactions/transactions.module";
+import { PrismaModule } from "./prisma/prisma.module";
+import { BffPracticeModule } from "./modules/bff-practice/bff-practice.module";
 
 @Module({
-  imports: [PrismaModule, CategoriesModule, TransactionsModule],
+  imports: [
+    PrismaModule,
+    CategoriesModule,
+    TransactionsModule,
+    BffPracticeModule,
+  ],
   controllers: [AppController],
 })
 // NestModule を implements することで、NestJSが起動時に configure() を呼んでMiddleware設定を読み込む。
@@ -16,6 +26,6 @@ export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer): void {
     // forRoutes('*') で全パスに AuthMiddleware を適用。
     // 将来 /auth/login のような公開エンドポイントが必要になったら .exclude(...) で除外する。
-    consumer.apply(AuthMiddleware).forRoutes('*');
+    consumer.apply(AuthMiddleware).forRoutes("*");
   }
 }
