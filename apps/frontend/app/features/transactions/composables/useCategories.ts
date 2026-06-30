@@ -30,5 +30,9 @@ export const useCategories = () => {
     }
   };
 
-  return { categories, fetchCategories };
+  const categoryItems = computed(() =>
+    categories.value.map((c) => ({ label: c.name, value: c.id })),
+  );
+
+  return { categories, categoryItems, fetchCategories };
 };

@@ -2598,6 +2598,314 @@ function Foo({ onChange }: { onChange: (value: string) =&gt; void }) {
           </div>
         </div>
       </details>
+
+      <!-- Q5 -->
+      <details class="qa">
+        <summary><code>defineModel</code> とは？ <code>v-model</code> を子コンポーネントで受け取る仕組み</summary>
+        <div class="qa-body">
+          <p>Vue 3.4+ で追加されたコンパイラマクロ。親から <code>v-model</code> で渡された値を、子コンポーネント内で <strong><code>ref</code> のように読み書きできる</strong> 仕組み。</p>
+
+          <h4>defineModel の役割</h4>
+          <ul>
+            <li><strong>読み取り</strong>（親の値を取得）と<strong>書き込み</strong>（親への更新通知）を1つの変数にまとめる</li>
+            <li><code>defineProps</code> が<strong>一方向</strong>の props 受け取りなのに対して、<code>defineModel</code> は<strong>双方向バインディング</strong>用</li>
+            <li><code>defineProps</code> と同じくコンパイラマクロ（import 不要、実行時に消える）</li>
+          </ul>
+
+          <h4>コード例（Vue）</h4>
+<pre><code>// 子コンポーネント（TransactionCreateModal.vue）
+const open = defineModel&lt;boolean&gt;('open', { required: true })
+
+// open.value を読めば親の値が取れる
+// open.value = false で親の値も更新される（emit が裏で自動発火）</code></pre>
+
+          <p>親側:</p>
+<pre><code>&lt;TransactionCreateModal v-model:open="isCreateModalOpen" /&gt;
+&lt;!-- isCreateModalOpen は親の ref。子が open.value = false にすると
+     isCreateModalOpen.value も false になる --&gt;</code></pre>
+
+          <h4>React との比較</h4>
+          <p>React では「値の受け取り」と「値の更新コールバック」を別々の props で渡す:</p>
+<pre><code>// React
+function TransactionCreateModal({ open, onOpenChange }) {
+  // 読み: open（boolean）
+  // 書き: onOpenChange(false) でコールバック経由で親に通知
+}
+
+// 親側
+&lt;TransactionCreateModal
+  open={isCreateModalOpen}
+  onOpenChange={setIsCreateModalOpen}
+/&gt;</code></pre>
+
+          <p>Vue の <code>defineModel</code> は、この2つを<strong>1つの変数にまとめる</strong>:</p>
+          <table>
+            <thead><tr><th>操作</th><th>React</th><th>Vue (<code>defineModel</code>)</th></tr></thead>
+            <tbody>
+              <tr><td>値を読む</td><td><code>open</code>（props）</td><td><code>open.value</code></td></tr>
+              <tr><td>値を更新</td><td><code>onOpenChange(false)</code></td><td><code>open.value = false</code></td></tr>
+              <tr><td>親の宣言</td><td><code>open={x} onOpenChange={setX}</code></td><td><code>v-model:open="x"</code></td></tr>
+            </tbody>
+          </table>
+
+          <h4>defineProps との使い分け</h4>
+          <table>
+            <thead><tr><th></th><th><code>defineProps</code></th><th><code>defineModel</code></th></tr></thead>
+            <tbody>
+              <tr><td>データの流れ</td><td>親 → 子（一方向）</td><td>親 ↔ 子（双方向）</td></tr>
+              <tr><td>子から書き換え</td><td><span class="cross">×</span> 禁止（読み取り専用）</td><td><span class="check">○</span> <code>.value = ...</code> で OK</td></tr>
+              <tr><td>用途</td><td>表示データ、設定値など</td><td>モーダルの開閉、フォームの入力値など</td></tr>
+              <tr><td>React 相当</td><td><code>props</code></td><td><code>props</code> + コールバック props のセット</td></tr>
+            </tbody>
+          </table>
+
+          <div class="note">
+            <strong>覚え方:</strong> <code>defineProps</code> = 一方通行（親→子）、<code>defineModel</code> = 双方向パイプ（親↔子）。モーダルの開閉状態など「子が閉じる操作をする必要がある」場合は <code>defineModel</code> の出番。
+          </div>
+        </div>
+      </details>
+
+      <!-- Q6 -->
+      <details class="qa">
+        <summary><code>computed</code> とは？ React の <code>useMemo</code> との違い</summary>
+        <div class="qa-body">
+          <p><code>computed</code> は<strong>依存する値が変わったときだけ再計算される算出プロパティ</strong>。React の <code>useMemo</code> に近いが、依存配列を手動で書く必要がない（Vue が自動追跡する）のが大きな違い。</p>
+
+          <h4>コード例（Vue）</h4>
+<pre><code>const categoryItems = computed(() =&gt;
+  categories.value.map((c) =&gt; ({ label: c.name, value: c.id }))
+)
+// categories.value が変わったら自動で再計算される
+// categories.value が変わらなければキャッシュされた値を返す</code></pre>
+
+          <h4>React 相当（useMemo）</h4>
+<pre><code>const categoryItems = useMemo(() =&gt;
+  categories.map((c) =&gt; ({ label: c.name, value: c.id })),
+  [categories]  // ← 手動で依存配列を書く必要がある
+)</code></pre>
+
+          <h4>Vue と React の比較</h4>
+          <table>
+            <thead><tr><th>観点</th><th>Vue (<code>computed</code>)</th><th>React (<code>useMemo</code>)</th></tr></thead>
+            <tbody>
+              <tr><td>依存の指定</td><td>自動追跡（書かなくていい）</td><td>手動で依存配列を書く</td></tr>
+              <tr><td>依存漏れのリスク</td><td>なし（Vue が勝手に追う）</td><td>あり（配列に入れ忘れると再計算されない）</td></tr>
+              <tr><td>キャッシュ</td><td>依存が変わらなければキャッシュ</td><td>依存が変わらなければキャッシュ</td></tr>
+              <tr><td>戻り値の参照</td><td><code>.value</code> 経由（ref と同じ）</td><td>そのまま使える</td></tr>
+            </tbody>
+          </table>
+
+          <h4>なぜ Vue は依存を自動追跡できるのか</h4>
+          <p>Vue のリアクティビティシステムは Proxy ベース。<code>computed</code> のコールバック内で <code>ref</code> や <code>reactive</code> の値を読んだ瞬間に、Vue が「この computed はこの ref に依存している」と記録する。だから依存配列を書く必要がない。</p>
+
+          <div class="note">
+            <strong>覚え方:</strong> <code>computed</code> = 依存配列なしの <code>useMemo</code>。Vue が依存を自動で追跡してくれるので、依存漏れバグが構造的に起きない。
+          </div>
+        </div>
+      </details>
+
+      <!-- Q7 -->
+      <details class="qa">
+        <summary><code>ref</code> と <code>reactive</code> の使い分け</summary>
+        <div class="qa-body">
+          <p>Vue のリアクティビティには <code>ref</code> と <code>reactive</code> の2つの API がある。どちらも値をリアクティブにするが、用途が違う。</p>
+
+          <h4>比較表</h4>
+          <table>
+            <thead><tr><th></th><th><code>ref</code></th><th><code>reactive</code></th></tr></thead>
+            <tbody>
+              <tr><td>用途</td><td>プリミティブ値、単体の値</td><td>オブジェクト、フォーム状態など</td></tr>
+              <tr><td>アクセス</td><td><code>.value</code> が必要</td><td>プロパティに直接アクセス</td></tr>
+              <tr><td>例</td><td><code>ref(false)</code>, <code>ref(0)</code></td><td><code>reactive({ type: 'expense', amount: ... })</code></td></tr>
+            </tbody>
+          </table>
+
+          <h4>コード例: ref（単体の値向き）</h4>
+<pre><code>const isLoading = ref(false)
+const count = ref(0)
+const name = ref('hello')
+
+// 読み書きは .value 経由
+isLoading.value = true
+console.log(count.value)  // 0</code></pre>
+
+          <h4>コード例: reactive（オブジェクト向き）</h4>
+<pre><code>// フォームのように複数プロパティをまとめて管理する場合は reactive が便利
+const state = reactive({
+  type: 'expense' as TransactionType,
+  categoryId: undefined as number | undefined,
+  amount: undefined as number | undefined,
+  date: new Date().toISOString().slice(0, 10),
+  isFixed: false,
+  note: '',
+})
+
+// プロパティに直接アクセス（.value 不要）
+state.type = 'income'
+console.log(state.amount)  // undefined</code></pre>
+
+          <h4>reactive と v-model の役割分担</h4>
+          <p><code>reactive</code> は「状態の箱」、<code>v-model</code> は「UI と箱を繋ぐパイプ」:</p>
+          <div class="ascii-art">reactive({ type: 'expense', amount: ... })   ← 状態の箱
+           ↕ v-model
+&lt;USelect v-model="state.type" /&gt;               ← UI（セレクトボックス）
+&lt;UInput  v-model="state.amount" /&gt;              ← UI（入力欄）
+
+ユーザーが UI を操作 → v-model が state を自動更新
+state が変わる       → v-model が UI を自動更新</div>
+
+          <h4>使い分けのガイドライン</h4>
+          <table>
+            <thead><tr><th>場面</th><th>どちらを使う？</th><th>理由</th></tr></thead>
+            <tbody>
+              <tr><td>boolean フラグ（モーダル開閉、ローディング）</td><td><code>ref</code></td><td>単体の値</td></tr>
+              <tr><td>数値カウンター</td><td><code>ref</code></td><td>単体の値</td></tr>
+              <tr><td>フォーム状態（複数フィールド）</td><td><code>reactive</code></td><td>オブジェクトとして一括管理が便利</td></tr>
+              <tr><td>API レスポンス</td><td><code>ref</code></td><td>配列やオブジェクトでも丸ごと差し替えるなら ref の方が安全</td></tr>
+            </tbody>
+          </table>
+
+          <div class="note">
+            <strong>覚え方:</strong> 迷ったら <code>ref</code> を使えば間違いない（Vue 公式も <code>ref</code> 推奨）。フォームのように複数プロパティを v-model で繋ぐ場面では <code>reactive</code> の方がスッキリ書ける。
+          </div>
+        </div>
+      </details>
+
+      <!-- Q8 -->
+      <details class="qa">
+        <summary><code>reactive</code> オブジェクトのリセットに <code>Object.assign</code> を使う理由</summary>
+        <div class="qa-body">
+          <p><code>reactive</code> で作ったオブジェクトは<strong>再代入するとリアクティブの繋がりが切れる</strong>。リセットには <code>Object.assign</code> を使って「同じオブジェクトの中身を書き換える」必要がある。</p>
+
+          <h4>なぜ再代入がダメなのか</h4>
+          <p>Vue のリアクティビティは Proxy ベース。<code>reactive()</code> が返すオブジェクト自体が Proxy で、テンプレートや watch はその Proxy を監視している。再代入すると<strong>別のオブジェクト</strong>になるため、監視対象から外れる。</p>
+
+<pre><code>// ❌ 再代入するとリアクティブの繋がりが切れる
+let state = reactive(getInitialState())
+
+// ... ユーザーが入力 ...
+
+state = reactive(getInitialState())
+// ↑ 新しい Proxy が作られるが、テンプレートは古い Proxy を見ている
+//   → UI が更新されない！</code></pre>
+
+<pre><code>// ✅ 同じオブジェクトの中身を書き換える
+const state = reactive(getInitialState())
+
+// ... ユーザーが入力 ...
+
+Object.assign(state, getInitialState())
+// ↑ 同じ Proxy オブジェクトのプロパティだけ上書き
+//   → リアクティブの繋がりが維持され、UI も更新される</code></pre>
+
+          <h4>モーダルのフォームリセットで必要になる場面</h4>
+          <p>コンポーネントのセットアップ（<code>&lt;script setup&gt;</code>）は<strong>1回しか走らない</strong>。モーダルを閉じて再度開いても、<code>reactive()</code> の初期化は実行されない。そのため、前回の入力値が残ってしまう。</p>
+
+          <div class="ascii-art">1回目のモーダル表示:
+  reactive(getInitialState())
+  → { type: 'expense', amount: undefined, note: '' }
+
+ユーザーが入力:
+  → { type: 'income', amount: 5000, note: '給料' }
+
+モーダルを閉じて再度開く:
+  ❌ setup は再実行されない → 前回の値が残る
+  ✅ Object.assign(state, getInitialState())
+     → { type: 'expense', amount: undefined, note: '' }  ← リセット成功</div>
+
+          <h4>React との根本的な違い</h4>
+          <p>React は「新しいオブジェクトで置き換え（イミュータブル）」、Vue は「同じオブジェクトを変異させる（ミュータブル）」:</p>
+
+<pre><code>// React: 新しいオブジェクトで置き換えて OK
+setState(getInitialState())
+// → React は「参照が変わった！」と検知して再レンダリング
+
+// Vue: 同じオブジェクトを変異させる必要がある
+Object.assign(state, getInitialState())
+// → Vue は Proxy 経由でプロパティの変更を検知して再レンダリング</code></pre>
+
+          <table>
+            <thead><tr><th></th><th>React</th><th>Vue (<code>reactive</code>)</th></tr></thead>
+            <tbody>
+              <tr><td>リセット方法</td><td><code>setState(newObj)</code></td><td><code>Object.assign(state, newObj)</code></td></tr>
+              <tr><td>変更検知の仕組み</td><td>参照の比較（=== で新旧比較）</td><td>Proxy がプロパティ書き換えを検知</td></tr>
+              <tr><td>思想</td><td>イミュータブル（置き換え）</td><td>ミュータブル（変異）</td></tr>
+            </tbody>
+          </table>
+
+          <div class="note warn">
+            <strong>注意:</strong> <code>ref</code> で管理しているオブジェクトなら <code>state.value = getInitialState()</code> で OK（ref は <code>.value</code> の再代入を許容する）。この <code>Object.assign</code> パターンは <code>reactive</code> 特有の話。
+          </div>
+        </div>
+      </details>
+
+      <!-- Q9 -->
+      <details class="qa">
+        <summary><code>watch</code> と React の <code>useEffect</code> の対応</summary>
+        <div class="qa-body">
+          <p><code>watch</code> は Vue 版の <code>useEffect</code>。<strong>監視対象の値が変わるたびにコールバックが発火する</strong>。ただし <code>useEffect</code> と違い、依存配列ではなく第1引数に監視対象を明示的に渡す。</p>
+
+          <h4>基本の書き方</h4>
+<pre><code>// Vue: watch(監視対象, コールバック)
+watch(open, (isOpen) =&gt; {
+  if (isOpen) {
+    Object.assign(state, getInitialState())
+    fetchCategories(state.type)
+  }
+})</code></pre>
+
+<pre><code>// React 相当: useEffect(コールバック, [依存配列])
+useEffect(() =&gt; {
+  if (open) {
+    setState(getInitialState())
+    fetchCategories(state.type)
+  }
+}, [open])</code></pre>
+
+          <h4>第2引数で変更前の値も取れる</h4>
+          <p><code>useEffect</code> にはない機能。コールバックの第2引数に古い値が入る:</p>
+<pre><code>watch(open, (newValue, oldValue) =&gt; {
+  console.log(`${oldValue} → ${newValue}`)  // false → true
+})</code></pre>
+
+          <h4>Vue と React の比較</h4>
+          <table>
+            <thead><tr><th>観点</th><th>Vue (<code>watch</code>)</th><th>React (<code>useEffect</code>)</th></tr></thead>
+            <tbody>
+              <tr><td>監視対象の指定</td><td>第1引数に明示的に渡す</td><td>第2引数の依存配列</td></tr>
+              <tr><td>古い値の取得</td><td><span class="check">○</span> コールバックの第2引数</td><td><span class="cross">×</span> 自前で ref に保存する必要あり</td></tr>
+              <tr><td>初回実行</td><td>デフォルトでは実行しない（<code>{ immediate: true }</code> で変更可能）</td><td>初回マウント時に必ず実行</td></tr>
+              <tr><td>クリーンアップ</td><td><code>onCleanup</code> コールバック</td><td>return で関数を返す</td></tr>
+              <tr><td>寿命</td><td>コンポーネントが生きてる間ずっと監視</td><td>再レンダリングごとに再登録（React のモデル上）</td></tr>
+            </tbody>
+          </table>
+
+          <h4>複数の値を監視する場合</h4>
+<pre><code>// Vue: 配列で渡す
+watch([open, selectedType], ([newOpen, newType]) =&gt; {
+  // open または selectedType が変わったら発火
+})</code></pre>
+
+<pre><code>// React: 依存配列に並べる
+useEffect(() =&gt; {
+  // open または selectedType が変わったら発火
+}, [open, selectedType])</code></pre>
+
+          <h4>pick-cash での使用例（TransactionCreateModal）</h4>
+<pre><code>// モーダルが開いたらフォームをリセットしてカテゴリを取得
+watch(open, (isOpen) =&gt; {
+  if (isOpen) {
+    Object.assign(state, getInitialState())
+    fetchCategories(state.type)
+  }
+})</code></pre>
+          <p>このパターンは「モーダルの開閉に連動した初期化処理」で頻出する。</p>
+
+          <div class="note">
+            <strong>覚え方:</strong> <code>watch</code> = <code>useEffect</code> の「監視対象を明示的に渡す版」。初回実行がデフォルトでないこと、古い値が取れることが <code>useEffect</code> との主な違い。
+          </div>
+        </div>
+      </details>
     </section>
 
     <!-- ============================================ -->

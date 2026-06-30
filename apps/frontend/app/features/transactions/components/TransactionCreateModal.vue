@@ -2,28 +2,15 @@
 import type { CreateTransactionInput } from '@pick-cash/shared';
 import { createTransactionSchema } from '@pick-cash/shared';
 import type { FormSubmitEvent } from '#ui/types';
+import { TYPE_ITEMS } from '../constants';
 
+// defineModel: 親の v-model:open を受け取り、読み書き可能な ref として扱う。
+// React の props + onChange コールバックを1つの変数にまとめたもの。
+// open.value = false とするだけで親の isCreateModalOpen も更新される。
 const open = defineModel<boolean>('open', { required: true });
 
 const { create } = useTransactions();
-const { categories, fetchCategories } = useCategories();
-
-const TYPE_ITEMS = [
-  { label: '支出', value: 'expense' as const },
-  { label: '収入', value: 'income' as const },
-];
-
-const categoryItems = computed(() =>
-  categories.value.map((c) => ({ label: c.name, value: c.id })),
-);
-
-const today = () => {
-  const d = new Date();
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-};
+const { categoryItems, fetchCategories } = useCategories();
 
 const getInitialState = () => ({
   type: 'expense' as const,
@@ -34,10 +21,16 @@ const getInitialState = () => ({
   isFixed: false,
 });
 
+// reactive: オブジェクト全体をリアクティブにする（ref と違い .value 不要でプロパティに直接アクセス）。
+// セットアップ時に1回だけ生成され、モーダルの開閉で消えない。
 const state = reactive(getInitialState());
 
+// watch: useEffect の依存配列に近い。open が変わるたびにコールバックが発火する。
+// 第1引数 isOpen には open の「新しい値」が入る。
 watch(open, (isOpen) => {
   if (isOpen) {
+    // Object.assign で既存オブジェクトのプロパティだけ上書きする。
+    // state = reactive(getInitialState()) と再代入するとリアクティブの繋がりが切れるため。
     Object.assign(state, getInitialState());
     fetchCategories(state.type);
   }
@@ -51,6 +44,8 @@ watch(
   },
 );
 
+// UForm の @submit は Zod バリデーション通過後にだけ発火する。
+// event.data にはスキーマでパース済みの値が入る。
 const onSubmit = async (event: FormSubmitEvent<CreateTransactionInput>) => {
   const data = { ...event.data, memo: event.data.memo || null };
   const success = await create(data);
