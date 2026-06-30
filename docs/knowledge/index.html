@@ -286,6 +286,7 @@
       <li><a href="#internals">NestJSの内部の仕組み</a></li>
       <li><a href="#api-implementation">API実装の進め方</a></li>
       <li><a href="#env-pitfalls">環境構築ハマりポイント</a></li>
+      <li><a href="#bff-pattern">BFF（Backend For Frontend）パターン</a></li>
     </ul>
   </nav>
 
@@ -1975,6 +1976,191 @@ const select = { id: true, ... } satisfies Prisma.TransactionSelect;</code></pre
 
         <div class="note">
           <strong>境界線:</strong> 「DB関連の型は Prisma が全部やってくれる、API契約は自前」が境界線。
+        </div>
+      </div>
+    </details>
+  </section>
+
+  <!-- ============================================ -->
+  <!-- カテゴリ: BFF（Backend For Frontend）パターン -->
+  <!-- ============================================ -->
+  <section class="category" id="bff-pattern">
+    <h2>BFF（Backend For Frontend）パターン</h2>
+    <p class="cat-desc">NestJS を BFF として使う場合のアーキテクチャ、HttpModule/HttpService の使い方、複数 API の集約パターン。</p>
+
+    <!-- Q1 -->
+    <details class="qa">
+      <summary>NestJS を BFF として使う場合のアーキテクチャはどうなる？</summary>
+      <div class="qa-body">
+        <p>BFF（Backend For Frontend）はフロントエンドとバックエンド API の間に立つ<strong>中継・集約層</strong>。NestJS の Controller → Service → Repository の3層構造はそのまま使える。違いは Repository 層で、Prisma（DB直接）の代わりに HttpService（HTTPクライアント）で外部 API を叩く形になる。</p>
+
+        <h4>通常のバックエンドと BFF の構成比較</h4>
+        <div class="ascii-art">通常のバックエンド:
+  Controller → Service → Repository（Prisma → DB）
+
+BFF:
+  Controller → Service → Repository（HttpService → 外部 API）</div>
+
+        <h4>各層の責務（BFF版）</h4>
+        <table>
+          <thead><tr><th>層</th><th>責務</th><th>BFF での具体的な役割</th></tr></thead>
+          <tbody>
+            <tr><td>Controller</td><td>HTTP エンドポイント</td><td>レスポンス形式のラップ（<code>{ data }</code>）</td></tr>
+            <tr><td>Service</td><td>ビジネスロジック</td><td>複数 API の集約・加工（<strong>BFF の本領</strong>）</td></tr>
+            <tr><td>Repository</td><td>データ取得</td><td>外部 API を叩くだけ（1メソッド = 1 API）</td></tr>
+          </tbody>
+        </table>
+
+        <h4>責務分離のポイント</h4>
+        <ul>
+          <li><strong>Controller</strong>: HTTP エンドポイント定義とレスポンス整形のみ。ロジックは書かない</li>
+          <li><strong>Service</strong>: 複数の Repository を呼んでデータを結合・加工する。BFF の価値はここに集約される</li>
+          <li><strong>Repository</strong>: 1メソッド = 1 API コール。外部 API の呼び出しを集約するだけ</li>
+        </ul>
+
+        <div class="note">
+          <strong>覚え方:</strong> BFF でも NestJS の3層構造は崩れない。変わるのは Repository の「データの取り先」だけ。DB か外部 API か、という違い。3層の責務分離はそのまま活きる。
+        </div>
+      </div>
+    </details>
+
+    <!-- Q2 -->
+    <details class="qa">
+      <summary>HttpModule / HttpService の使い方は？</summary>
+      <div class="qa-body">
+        <p><code>@nestjs/axios</code> パッケージで提供される NestJS 公式の HTTP クライアント。内部は <strong>axios ベース</strong>。Module に <code>HttpModule</code> を import し、<code>HttpService</code> を DI して使う。</p>
+
+        <h4>セットアップの流れ</h4>
+        <ol>
+          <li><code>@nestjs/axios</code> と <code>axios</code> をインストール</li>
+          <li>Module の <code>imports</code> に <code>HttpModule</code> を追加</li>
+          <li>Repository（または Service）で <code>HttpService</code> を DI して使う</li>
+        </ol>
+
+        <h4>コード例: Module の設定</h4>
+<pre><code>import { HttpModule } from '@nestjs/axios';
+
+@Module({
+  imports: [HttpModule],
+  providers: [BffPracticeRepository],
+})
+export class BffPracticeModule {}</code></pre>
+
+        <h4>コード例: Repository での使い方</h4>
+<pre><code>import { HttpService } from '@nestjs/axios';
+import { firstValueFrom } from 'rxjs';
+
+@Injectable()
+export class BffPracticeRepository {
+  constructor(private readonly httpService: HttpService) {}
+
+  async fetchPosts(): Promise&lt;Post[]&gt; {
+    const { data } = await firstValueFrom(
+      this.httpService.get&lt;Post[]&gt;('https://example.com/posts'),
+    );
+    return data;
+  }
+}</code></pre>
+
+        <h4>Observable → Promise 変換が必要な理由</h4>
+        <p><code>httpService.get()</code> は <strong>Observable（RxJS）</strong> を返す。NestJS の内部が RxJS ベースなため。しかし普段の async/await で使いたいので、<code>firstValueFrom()</code> で Promise に変換する。</p>
+        <div class="ascii-art">httpService.get&lt;Post[]&gt;(url)
+  → Observable&lt;AxiosResponse&lt;Post[]&gt;&gt;   ← RxJS の Observable
+
+firstValueFrom(observable)
+  → Promise&lt;AxiosResponse&lt;Post[]&gt;&gt;      ← async/await で使える
+
+const { data } = await firstValueFrom(...)
+  → data: Post[]                         ← レスポンスボディを取り出し</div>
+
+        <h4>ジェネリクスで型指定</h4>
+        <p><code>httpService.get&lt;T&gt;()</code> のジェネリクスでレスポンスの型を指定できる。これにより <code>data</code> の型が <code>T</code> に推論される。</p>
+<pre><code>// T = Post[] を指定
+this.httpService.get&lt;Post[]&gt;('https://example.com/posts')
+// → data の型が Post[] になる</code></pre>
+
+        <div class="note">
+          <strong>覚え方:</strong> <code>HttpModule</code> を import → <code>HttpService</code> を DI → <code>firstValueFrom()</code> で Promise 化 → <code>{ data }</code> で取り出し。この4ステップが BFF Repository の定型パターン。
+        </div>
+      </div>
+    </details>
+
+    <!-- Q3 -->
+    <details class="qa">
+      <summary>BFF での複数 API 集約パターンは？</summary>
+      <div class="qa-body">
+        <p>BFF の主な仕事は<strong>「複数の API を叩いて、フロント向けに加工・結合して返す」</strong>こと。Service 層がこの集約ロジックを担当する。</p>
+
+        <h4>集約の全体像</h4>
+        <div class="ascii-art">フロントエンド
+    ↓ GET /bff-practice
+BFF (NestJS)
+    ├→ GET /posts   （Repository.fetchPosts）
+    ├→ GET /users   （Repository.fetchUsers）
+    ↓ Service で結合・加工
+    ↓ { ...post, userName: "John" }
+フロントエンド</div>
+
+        <h4>コード例: Service（集約ロジック）</h4>
+<pre><code>async findAll() {
+  const [posts, users] = await Promise.all([
+    this.repository.fetchPosts(),
+    this.repository.fetchUsers(),
+  ]);
+
+  return posts.map((post) =&gt; {
+    const user = users.find((user) =&gt; user.id === post.userId);
+    return {
+      ...post,
+      userName: user ? user.name : null,
+    };
+  });
+}</code></pre>
+
+        <h4>ポイント解説</h4>
+        <table>
+          <thead><tr><th>テクニック</th><th>目的</th><th>詳細</th></tr></thead>
+          <tbody>
+            <tr><td><code>Promise.all</code></td><td>パフォーマンス</td><td>複数の API を<strong>並列</strong>で取得。直列にすると待ち時間が積み上がる</td></tr>
+            <tr><td><code>map</code> + <code>find</code></td><td>データ結合</td><td>異なるリソースを突合する。<strong>SQL の JOIN をコードでやるイメージ</strong></td></tr>
+            <tr><td>外部 API のレスポンス型定義</td><td>型安全</td><td>案件では OpenAPI / Swagger から型生成が多い</td></tr>
+          </tbody>
+        </table>
+
+        <h4>直列 vs 並列の違い</h4>
+        <div class="ascii-art">直列（❌ 遅い）:
+  fetchPosts()  ──200ms──→ 完了
+                            fetchUsers()  ──150ms──→ 完了
+  合計: 350ms
+
+並列（✅ 速い）:
+  fetchPosts()  ──200ms──→ 完了
+  fetchUsers()  ──150ms──→ 完了
+  合計: 200ms（遅い方に揃う）</div>
+
+        <h4>コード例: Repository（個別 API 呼び出し）</h4>
+<pre><code>@Injectable()
+export class BffPracticeRepository {
+  constructor(private readonly httpService: HttpService) {}
+
+  async fetchPosts(): Promise&lt;Post[]&gt; {
+    const { data } = await firstValueFrom(
+      this.httpService.get&lt;Post[]&gt;('https://example.com/posts'),
+    );
+    return data;
+  }
+
+  async fetchUsers(): Promise&lt;User[]&gt; {
+    const { data } = await firstValueFrom(
+      this.httpService.get&lt;User[]&gt;('https://example.com/users'),
+    );
+    return data;
+  }
+}</code></pre>
+        <p>Repository は<strong>1メソッド = 1 API コール</strong>の原則を守る。集約ロジックは Service に任せる。</p>
+
+        <div class="note">
+          <strong>覚え方:</strong> BFF の集約パターンは「<code>Promise.all</code> で並列取得 → <code>map</code> + <code>find</code> で結合」が基本形。SQL の JOIN をコードで書いてると思えばイメージしやすい。Repository は API を叩くだけ、Service で結合するという責務分離が大事。
         </div>
       </div>
     </details>
