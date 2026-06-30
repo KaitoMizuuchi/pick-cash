@@ -9,6 +9,11 @@ defineProps<{
   transactions: TransactionListItem[];
   error?: Error | null;
 }>();
+
+const emit = defineEmits<{
+  edit: [transaction: TransactionListItem];
+  delete: [transaction: TransactionListItem];
+}>();
 </script>
 
 <template>
@@ -51,6 +56,23 @@ defineProps<{
         :class="tx.type === 'income' ? 'text-blue-600' : 'text-red-600'"
       >
         {{ tx.type === 'income' ? '+' : '-' }}{{ formatAmount(tx.amount) }}
+      </div>
+
+      <div class="flex shrink-0 gap-1">
+        <UButton
+          variant="ghost"
+          color="neutral"
+          size="xs"
+          icon="i-lucide-pencil"
+          @click="emit('edit', tx)"
+        />
+        <UButton
+          variant="ghost"
+          color="error"
+          size="xs"
+          icon="i-lucide-trash-2"
+          @click="emit('delete', tx)"
+        />
       </div>
     </li>
 

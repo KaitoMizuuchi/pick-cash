@@ -84,11 +84,65 @@ export const useTransactions = () => {
     }
   };
 
+  const update = async (id: string, input: CreateTransactionInput): Promise<boolean> => {
+    try {
+      const updated = await $fetch<TransactionListItem>(`/transactions/${id}`, {
+        method: 'PATCH',
+        baseURL: config.public.apiBase,
+        body: input,
+      });
+      const index = _transactions.value.findIndex((t) => t.id === id);
+      if (index !== -1) {
+        _transactions.value[index] = updated;
+      }
+      toast.add({
+        title: '取引を更新しました',
+        color: 'success',
+        icon: 'i-lucide-circle-check',
+      });
+      return true;
+    } catch (e) {
+      toast.add({
+        title: '更新に失敗しました',
+        description: getErrorDescription(e),
+        color: 'error',
+        icon: 'i-lucide-circle-x',
+      });
+      return false;
+    }
+  };
+
+  const remove = async (id: string): Promise<boolean> => {
+    try {
+      await $fetch(`/transactions/${id}`, {
+        method: 'DELETE',
+        baseURL: config.public.apiBase,
+      });
+      _transactions.value = _transactions.value.filter((t) => t.id !== id);
+      toast.add({
+        title: '取引を削除しました',
+        color: 'success',
+        icon: 'i-lucide-circle-check',
+      });
+      return true;
+    } catch (e) {
+      toast.add({
+        title: '削除に失敗しました',
+        description: getErrorDescription(e),
+        color: 'error',
+        icon: 'i-lucide-circle-x',
+      });
+      return false;
+    }
+  };
+
   return {
     transactions: _transactions,
     isLoading: _isLoading,
     error: _error,
     fetchAll,
     create,
+    update,
+    remove,
   };
 };
