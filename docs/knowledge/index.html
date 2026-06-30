@@ -1420,6 +1420,610 @@ DB
         </div>
       </div>
     </details>
+
+    <!-- Q4 -->
+    <details class="qa">
+      <summary>NestJS リクエストライフサイクルの全体像 — リクエスト着信からレスポンス返却まで</summary>
+      <div class="qa-body">
+        <p>NestJS ではリクエストが着信してからレスポンスが返るまでに、複数の「層」を順番に通過する。各層には明確な役割があり、処理の順序も厳密に決まっている。この全体像を把握しておくと「この処理はどの層に書くべきか？」という判断が素早くできるようになる。</p>
+
+        <h4>リクエストライフサイクル全体図</h4>
+        <div class="ascii-art">リクエスト着信
+  │
+  ▼
+① Middleware（Express 互換）
+  │  例: AuthMiddleware（req.userId を注入）
+  │  → リクエスト/レスポンスを自由に操作
+  │  → next() で次に進む
+  │
+  ▼
+② Guards（認証・認可）
+  │  例: JwtAuthGuard, RolesGuard
+  │  → true / false を返す
+  │  → false なら 403 Forbidden で即終了
+  │
+  ▼
+③ Interceptors（前半）
+  │  例: LoggingInterceptor, CacheInterceptor
+  │  → リクエストを加工、タイマー開始など
+  │
+  ▼
+④ Pipes（バリデーション・変換）
+  │  例: ZodValidationPipe, ParseIntPipe
+  │  → パラメータを検証・変換
+  │  → 失敗なら 400 Bad Request
+  │
+  ▼
+⑤ Controller → Service → Repository
+  │  実際のビジネスロジック
+  │
+  ▼
+⑥ Interceptors（後半）
+  │  → レスポンスを加工、ログ出力など
+  │
+  ▼
+⑦ Exception Filters（例外発生時のみ）
+  │  例: GlobalExceptionFilter
+  │  → ①〜⑥のどこで例外が起きてもここで捕まる
+  │
+  ▼
+レスポンス返却</div>
+
+        <h4>各層の役割まとめ</h4>
+        <table>
+          <thead><tr><th>順序</th><th>層</th><th>役割</th><th>pick-cash での実装</th></tr></thead>
+          <tbody>
+            <tr><td>①</td><td>Middleware</td><td>req/res を直接操作（ログ、認証トークン検証、ヘッダー注入）</td><td>AuthMiddleware</td></tr>
+            <tr><td>②</td><td>Guard</td><td>通すか弾くかの判定（認証・認可）</td><td>未使用</td></tr>
+            <tr><td>③</td><td>Interceptor（前半）</td><td>リクエストの前処理（タイマー開始、リクエストログ）</td><td>未使用</td></tr>
+            <tr><td>④</td><td>Pipe</td><td>パラメータの検証・型変換</td><td>ZodValidationPipe（グローバル登録）</td></tr>
+            <tr><td>⑤</td><td>Controller → Service → Repository</td><td>ビジネスロジック</td><td>各機能モジュール</td></tr>
+            <tr><td>⑥</td><td>Interceptor（後半）</td><td>レスポンスの後処理（ログ、フォーマット変換）</td><td>未使用</td></tr>
+            <tr><td>⑦</td><td>Exception Filter</td><td>例外の捕捉・エラーレスポンスの整形</td><td>GlobalExceptionFilter</td></tr>
+          </tbody>
+        </table>
+
+        <h4>ポイント</h4>
+        <ul>
+          <li>Interceptor だけが「前半」と「後半」に分かれている（Controller の実行を前後から挟む構造）</li>
+          <li>Exception Filter は①〜⑥の<strong>どこで例外が起きても</strong>捕捉する最後の砦</li>
+          <li>Guard が false を返した時点でリクエストはそこで終了（④以降は実行されない）</li>
+          <li>Pipe が失敗した時点で Controller には到達しない</li>
+        </ul>
+
+        <div class="note">
+          <strong>覚え方:</strong> 「<strong>M → G → I → P → C → I → E</strong>」（Middleware → Guard → Interceptor → Pipe → Controller → Interceptor → ExceptionFilter）。Guard と Pipe は「ダメなら即終了」、Interceptor は「前後で挟む」、Exception Filter は「どこで爆発しても拾う」。
+        </div>
+      </div>
+    </details>
+
+    <!-- Q5 -->
+    <details class="qa">
+      <summary>Middleware とは？ — Express の仕組みをそのまま使う層</summary>
+      <div class="qa-body">
+        <p>NestJS の Middleware は Express の <code>app.use()</code> と同じ仕組み。リクエストライフサイクルの<strong>最初に通過する層</strong>で、生の <code>req</code> / <code>res</code> オブジェクトを直接触れる。</p>
+
+        <h4>基本構造</h4>
+<pre><code>@Injectable()
+export class AuthMiddleware implements NestMiddleware {
+  use(req: Request, res: Response, next: NextFunction): void {
+    // req / res を自由に操作
+    req.userId = extractUserIdFromToken(req.headers.authorization);
+    next();  // ← 次の処理（Guard → Interceptor → ...）に進む
+  }
+}</code></pre>
+
+        <h4>Middleware の特徴</h4>
+        <ul>
+          <li>Express の <code>app.use()</code> と同じ仕組み</li>
+          <li><code>req</code> / <code>res</code> オブジェクトを<strong>直接触れる</strong></li>
+          <li><code>next()</code> を呼ぶことで次の処理に進む</li>
+          <li><strong>どの Controller のどのメソッドに行くかは知らない</strong>（ルーティング解決前に動く）</li>
+          <li>登録は <code>AppModule.configure()</code> で行う（<code>@UseXxx()</code> デコレータは存在しない）</li>
+        </ul>
+
+        <h4>使いどころ</h4>
+        <table>
+          <thead><tr><th>用途</th><th>具体例</th></tr></thead>
+          <tbody>
+            <tr><td>ログ出力</td><td>全リクエストの URL / メソッド / 所要時間をログに記録</td></tr>
+            <tr><td>CORS</td><td>Cross-Origin Resource Sharing のヘッダー付与</td></tr>
+            <tr><td>ヘッダー注入</td><td>リクエストに追加情報（ユーザーID など）を付与</td></tr>
+            <tr><td>簡易認証</td><td>JWT トークンを検証して <code>req.userId</code> を注入</td></tr>
+          </tbody>
+        </table>
+
+        <h4>pick-cash の AuthMiddleware</h4>
+        <p>このプロジェクトの <code>common/middlewares/auth.middleware.ts</code> がまさに Middleware の実例。JWT トークンを検証して <code>req.userId</code> を注入する処理を行っている。</p>
+
+        <h4>登録方法</h4>
+<pre><code>@Module({...})
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer): void {
+    consumer.apply(AuthMiddleware).forRoutes('*');
+    //                                     ↑ 全ルートに適用
+  }
+}</code></pre>
+        <p><code>forRoutes('*')</code> で全ルートに適用。特定のルートだけに適用したい場合は <code>forRoutes('categories')</code> のように指定する。</p>
+
+        <h4>重要: Middleware はルーティング解決「前」に動く</h4>
+        <div class="ascii-art">リクエスト着信: GET /categories/123
+  │
+  ▼
+Middleware  ← この時点ではまだ「GET /categories/123 → CategoriesController.findOne」
+             という紐付けは解決されていない。
+             Middleware は「どの Controller に行くか」を知らない。
+  │
+  ▼
+NestJS のルーティング解決
+  │
+  ▼
+Guard → Interceptor → Pipe → Controller  ← ここからは Controller を知っている</div>
+
+        <div class="note">
+          <strong>覚え方:</strong> Middleware は「Express のレイヤー」。NestJS の抽象化（Guard / Interceptor 等）より<strong>一段下</strong>で動く。「全リクエストに共通の前処理」で、どの Controller に行くかを知らない状態で動くのが最大の特徴。
+        </div>
+      </div>
+    </details>
+
+    <!-- Q6 -->
+    <details class="qa">
+      <summary>Guards とは？ — Middleware との違い</summary>
+      <div class="qa-body">
+        <p>Guard は<strong>「通していいか（true/false）」を判定する層</strong>。認証（この人は誰？）と認可（この操作をしていい？）に使う。Middleware と似ているが、<strong>決定的な違いが1つある</strong>。</p>
+
+        <h4>Guard の基本構造</h4>
+<pre><code>@Injectable()
+export class RolesGuard implements CanActivate {
+  canActivate(context: ExecutionContext): boolean {
+    const request = context.switchToHttp().getRequest();
+    const requiredRoles = this.reflector.get&lt;string[]&gt;('roles', context.getHandler());
+
+    if (!requiredRoles) return true;  // ロール指定なし → 通す
+
+    const userRole = request.userId ? 'user' : 'guest';
+    return requiredRoles.includes(userRole);
+    // true → リクエスト続行
+    // false → 403 Forbidden で即終了
+  }
+}</code></pre>
+
+        <h4>Guard と Middleware の最大の違い</h4>
+        <table>
+          <thead><tr><th></th><th>Middleware</th><th>Guard</th></tr></thead>
+          <tbody>
+            <tr><td><strong>ExecutionContext</strong></td><td><span class="cross">×</span> アクセスできない</td><td><span class="check">○</span> アクセスできる</td></tr>
+            <tr><td>Controller/メソッドの情報</td><td>知らない（ルーティング解決前）</td><td><strong>知っている</strong>（どの Controller のどのメソッドに行くか分かる）</td></tr>
+            <tr><td>判定ロジック</td><td>自由（next() を呼ぶか呼ばないか）</td><td>true / false を返すだけ</td></tr>
+            <tr><td>適用単位</td><td>ルートパス単位（<code>forRoutes('*')</code>）</td><td>メソッド/クラス単位（<code>@UseGuards()</code>）</td></tr>
+          </tbody>
+        </table>
+
+        <p><strong>ExecutionContext にアクセスでき、どの Controller のどのメソッドに行くかを知っている</strong> — これが Middleware との最大の違い。</p>
+
+        <h4>Middleware と Guard の使い分け</h4>
+        <div class="ascii-art">Middleware: 「全リクエストに JWT トークンを検証する」
+             → ルート関係なく全体に適用
+             → req.userId を注入する（通すか弾くかの判定ではない）
+
+Guard:      「このエンドポイントは admin ロールだけ許可」
+             → メソッド単位で制御
+             → true / false で通す・弾くを判定</div>
+
+        <h4>Guard はデコレータでメソッド単位に適用できる</h4>
+<pre><code>@UseGuards(RolesGuard)
+@Roles('admin')
+@Get('admin-only')
+async adminEndpoint() {
+  // RolesGuard が true を返した場合のみここに到達
+  return { message: '管理者専用データ' };
+}</code></pre>
+        <p>この書き方は Middleware ではできない。Guard は NestJS の抽象化レイヤーで動くため、デコレータ（<code>@UseGuards()</code>）で柔軟に適用範囲を制御できる。</p>
+
+        <h4>Guard が false を返した場合</h4>
+        <div class="ascii-art">リクエスト着信
+  │
+  ▼
+Middleware  ← 通過（req.userId を注入）
+  │
+  ▼
+Guard      ← false を返す
+  │
+  ▼
+403 Forbidden（即終了）
+  ※ Interceptor / Pipe / Controller は一切実行されない</div>
+
+        <h4>Guard の適用方法3パターン</h4>
+        <table>
+          <thead><tr><th>適用範囲</th><th>書き方</th></tr></thead>
+          <tbody>
+            <tr><td>特定メソッドだけ</td><td><code>@UseGuards(RolesGuard)</code> をメソッドに付ける</td></tr>
+            <tr><td>特定 Controller 全体</td><td><code>@UseGuards(RolesGuard)</code> をクラスに付ける</td></tr>
+            <tr><td>アプリ全体</td><td><code>app.useGlobalGuards(new RolesGuard())</code> または <code>providers: [{ provide: APP_GUARD, useClass: RolesGuard }]</code></td></tr>
+          </tbody>
+        </table>
+
+        <div class="note">
+          <strong>覚え方:</strong> Middleware は「全リクエストに対する前処理」（ルート関係なく）。Guard は「通すか弾くかの判定」（メソッド単位で制御可能）。<strong>「ExecutionContext を知ってるかどうか」</strong>が分水嶺。
+        </div>
+      </div>
+    </details>
+
+    <!-- Q7 -->
+    <details class="qa">
+      <summary>Interceptors とは？ — Controller の実行を前後から挟む層（AOP 的）</summary>
+      <div class="qa-body">
+        <p>Interceptor は Controller の実行を<strong>前後から挟む</strong>層。AOP（アスペクト指向プログラミング）的な考え方で、「本体のロジックに手を入れずに、前処理・後処理を差し込む」ことができる。</p>
+
+        <h4>Interceptor の実行タイミング</h4>
+        <div class="ascii-art">リクエスト着信
+  │
+  ▼
+Middleware → Guard
+  │
+  ▼
+Interceptor（前半）  ← ここでリクエストを加工、タイマー開始など
+  │
+  ▼
+Pipe → Controller → Service → Repository
+  │
+  ▼
+Interceptor（後半）  ← ここでレスポンスを加工、ログ出力など
+  │
+  ▼
+レスポンス返却</div>
+
+        <h4>Guard との違い</h4>
+        <table>
+          <thead><tr><th></th><th>Guard</th><th>Interceptor</th></tr></thead>
+          <tbody>
+            <tr><td>役割</td><td>通すか弾くかの <strong>yes/no 判定だけ</strong></td><td>リクエスト/レスポンスの<strong>データを加工</strong>できる</td></tr>
+            <tr><td>戻り値</td><td><code>boolean</code></td><td><code>Observable&lt;any&gt;</code>（レスポンスを変形可能）</td></tr>
+            <tr><td>タイミング</td><td>Controller 前のみ</td><td>Controller の<strong>前と後</strong></td></tr>
+          </tbody>
+        </table>
+
+        <h4>BFF で特に使う場面</h4>
+        <table>
+          <thead><tr><th>用途</th><th>具体例</th></tr></thead>
+          <tbody>
+            <tr><td>レスポンスの統一フォーマット化</td><td><code>{ data, meta }</code> でラップして返す</td></tr>
+            <tr><td>リクエスト/レスポンスのログ出力</td><td>処理時間、ステータスコード、エラー情報を記録</td></tr>
+            <tr><td>タイムアウト制御</td><td>一定時間内に応答がなければエラーを返す</td></tr>
+            <tr><td>キャッシュ</td><td>同じリクエストに対してキャッシュされた結果を返す</td></tr>
+          </tbody>
+        </table>
+
+        <h4>コード例: LoggingInterceptor</h4>
+<pre><code>@Injectable()
+export class LoggingInterceptor implements NestInterceptor {
+  intercept(context: ExecutionContext, next: CallHandler): Observable&lt;any&gt; {
+    const now = Date.now();
+    console.log('Before...');
+
+    return next.handle().pipe(
+      tap(() =&gt; console.log(`After... ${Date.now() - now}ms`)),
+    );
+  }
+}</code></pre>
+
+        <h4>コードの読み方</h4>
+        <div class="ascii-art">intercept() が呼ばれる
+  │
+  ├─ 「Before...」をログ出力  ← 前半（Controller 実行前）
+  │
+  ├─ next.handle()  ← Controller を実行（RxJS の Observable を返す）
+  │
+  └─ .pipe(tap(...))  ← 後半（Controller 実行後）
+       └─ 「After... 120ms」をログ出力</div>
+
+        <ul>
+          <li><code>next.handle()</code> が「Controller 以降の処理を実行する」トリガー</li>
+          <li><code>.pipe()</code> の中で RxJS の演算子を使ってレスポンスを加工できる</li>
+          <li><code>tap()</code> は「値を変えずに副作用（ログ出力など）を実行する」演算子</li>
+          <li><code>map()</code> を使えばレスポンスの値を変形することもできる</li>
+        </ul>
+
+        <h4>レスポンスを変形する例</h4>
+<pre><code>@Injectable()
+export class TransformInterceptor implements NestInterceptor {
+  intercept(context: ExecutionContext, next: CallHandler): Observable&lt;any&gt; {
+    return next.handle().pipe(
+      map(data =&gt; ({ data, timestamp: new Date().toISOString() })),
+      //  ↑ Controller の戻り値を { data, timestamp } でラップ
+    );
+  }
+}</code></pre>
+
+        <h4>適用方法</h4>
+<pre><code>// メソッド単位
+@UseInterceptors(LoggingInterceptor)
+@Get()
+findAll() { ... }
+
+// Controller 全体
+@UseInterceptors(LoggingInterceptor)
+@Controller('categories')
+export class CategoriesController { ... }
+
+// アプリ全体
+app.useGlobalInterceptors(new LoggingInterceptor());</code></pre>
+
+        <div class="note">
+          <strong>覚え方:</strong> Interceptor は「Controller を<strong>前後から挟むサンドイッチ</strong>」。Guard は yes/no だけだが、Interceptor は<strong>データを加工</strong>できる。RxJS の <code>pipe()</code> でレスポンスを変形するのがキモ。
+        </div>
+      </div>
+    </details>
+
+    <!-- Q8 -->
+    <details class="qa">
+      <summary>Pipes とは？ — パラメータの検証・型変換を担当する層</summary>
+      <div class="qa-body">
+        <p>Pipe は Controller メソッドの<strong>引数（パラメータ）を検証・型変換</strong>する層。Interceptor がリクエスト/レスポンス全体を扱うのに対し、Pipe は<strong>パラメータ単位</strong>で動く。</p>
+
+        <h4>Pipe の役割</h4>
+        <ul>
+          <li><strong>バリデーション</strong>: パラメータの値が正しいかチェックする（不正なら 400 Bad Request）</li>
+          <li><strong>型変換</strong>: 文字列を数値に変換するなど、Controller が期待する型に変換する</li>
+        </ul>
+
+        <h4>Pipe の実行タイミング</h4>
+        <div class="ascii-art">リクエスト着信
+  │
+  ▼
+Middleware → Guard → Interceptor（前半）
+  │
+  ▼
+Pipe  ← Controller メソッドの引数ごとに実行
+  │     @Body() → Pipe で検証 → Controller に渡す
+  │     @Query() → Pipe で検証 → Controller に渡す
+  │     @Param() → Pipe で検証 → Controller に渡す
+  │
+  │  失敗した場合 → 400 Bad Request（Controller には到達しない）
+  │
+  ▼
+Controller（検証済みの値だけ受け取る）</div>
+
+        <h4>このプロジェクトでの Pipe の使い方</h4>
+        <p>pick-cash では <code>nestjs-zod</code> の <code>ZodValidationPipe</code> がグローバル登録されている。これにより、DTO クラスに紐付いた Zod スキーマで<strong>全エンドポイントのパラメータが自動検証</strong>される。</p>
+
+<pre><code>// main.ts で1行書くだけ
+app.useGlobalPipes(new ZodValidationPipe());
+
+// Controller で DTO 型の引数を受け取ると自動で検証が走る
+@Post()
+create(@Body() dto: CreateTransactionDto) {
+  // ← ここに到達した時点で dto は Zod スキーマで検証済み
+  return this.service.create(dto);
+}</code></pre>
+
+        <h4>ビルトイン Pipe の例</h4>
+        <table>
+          <thead><tr><th>Pipe</th><th>役割</th><th>使用例</th></tr></thead>
+          <tbody>
+            <tr><td><code>ParseIntPipe</code></td><td>文字列 → 数値変換</td><td><code>@Param('id', ParseIntPipe) id: number</code></td></tr>
+            <tr><td><code>ParseBoolPipe</code></td><td>文字列 → boolean変換</td><td><code>@Query('active', ParseBoolPipe) active: boolean</code></td></tr>
+            <tr><td><code>ParseUUIDPipe</code></td><td>UUID形式の検証</td><td><code>@Param('id', ParseUUIDPipe) id: string</code></td></tr>
+            <tr><td><code>DefaultValuePipe</code></td><td>デフォルト値の設定</td><td><code>@Query('page', new DefaultValuePipe(1)) page: number</code></td></tr>
+            <tr><td><code>ValidationPipe</code></td><td>class-validator ベースの検証</td><td>NestJS 標準（pick-cash では代わりに ZodValidationPipe）</td></tr>
+          </tbody>
+        </table>
+
+        <h4>ParseIntPipe のコード例</h4>
+<pre><code>// URL パラメータは常に文字列で届く
+// ParseIntPipe が数値に変換してくれる
+@Get(':id')
+findOne(@Param('id', ParseIntPipe) id: number) {
+  // id は number 型として受け取れる（文字列 → 数値変換済み）
+  // "abc" のような数値に変換できない値が来たら 400 Bad Request
+  return this.service.findOne(id);
+}</code></pre>
+
+        <h4>Pipe が失敗した場合の流れ</h4>
+        <div class="ascii-art">クライアント: POST /transactions
+  Body: { amount: "abc" }  ← 不正な値
+  │
+  ▼
+ZodValidationPipe: schema.parse() → 失敗
+  │
+  ▼
+ZodValidationException が throw される
+  │
+  ▼
+GlobalExceptionFilter で捕捉
+  │
+  ▼
+レスポンス: { statusCode: 400, message: '入力内容に誤りがあります' }</div>
+
+        <div class="note">
+          <strong>覚え方:</strong> Pipe は「Controller の<strong>入口の検問</strong>」。パラメータ単位で「この値は正しいか？」をチェックし、不正なら Controller に到達させない。pick-cash では ZodValidationPipe がグローバル登録されているので、DTO を書くだけで自動的にバリデーションが効く。
+        </div>
+      </div>
+    </details>
+
+    <!-- Q9 -->
+    <details class="qa">
+      <summary>Exception Filters とは？ — 例外を捕捉する最後の砦</summary>
+      <div class="qa-body">
+        <p>Exception Filter は<strong>①〜⑥のどの層で例外が発生しても捕捉する最後の砦</strong>。エラーレスポンスのフォーマットを統一し、ユーザーに返すメッセージを整形する役割を担う。</p>
+
+        <h4>Exception Filter の位置づけ</h4>
+        <div class="ascii-art">① Middleware  ─┐
+② Guard      ─┤
+③ Interceptor ─┤  どの層で例外が起きても…
+④ Pipe       ─┤
+⑤ Controller ─┤
+⑥ Interceptor ─┘
+                │
+                ▼
+⑦ Exception Filter  ← ここで全部キャッチ
+                │
+                ▼
+エラーレスポンスをクライアントに返す</div>
+
+        <h4>pick-cash の GlobalExceptionFilter</h4>
+        <p>このプロジェクトの <code>common/filters/globalException.filter.ts</code> が Exception Filter の実例。HTTP ステータスコードに応じた<strong>日本語メッセージ</strong>を返す設計になっている。</p>
+
+<pre><code>@Catch()  // ← 引数なし: 全例外を捕捉
+export class GlobalExceptionFilter implements ExceptionFilter {
+  catch(exception: unknown, host: ArgumentsHost): void {
+    const ctx = host.switchToHttp();
+    const response = ctx.getResponse&lt;Response&gt;();
+
+    // HTTP ステータスコードを決定
+    const status = exception instanceof HttpException
+      ? exception.getStatus()
+      : HttpStatus.INTERNAL_SERVER_ERROR;
+
+    // 詳細はサーバーログに出力（情報漏洩しない）
+    console.error(exception);
+
+    // クライアントには汎用メッセージだけ返す
+    response.status(status).json({
+      statusCode: status,
+      message: DEFAULT_MESSAGES[status] ?? 'サーバーエラーが発生しました',
+    });
+  }
+}</code></pre>
+
+        <h4>DEFAULT_MESSAGES の例</h4>
+<pre><code>const DEFAULT_MESSAGES: Record&lt;number, string&gt; = {
+  400: '入力内容に誤りがあります',
+  401: '認証に失敗しました',
+  403: 'この操作は許可されていません',
+  404: '対象のデータが見つかりません',
+  409: 'データが重複しています',
+  500: 'サーバーエラーが発生しました',
+};</code></pre>
+
+        <h4>Exception Filter の特徴</h4>
+        <ul>
+          <li><code>@Catch()</code> の引数で捕捉する例外の種類を指定できる</li>
+          <li>引数なし（<code>@Catch()</code>）で全例外を捕捉</li>
+          <li>引数あり（<code>@Catch(HttpException)</code>）で特定の例外だけ捕捉</li>
+          <li>詳細なエラー情報は <code>console.error</code> に出力し、クライアントには<strong>汎用メッセージだけ</strong>返す（情報漏洩を防ぐ）</li>
+        </ul>
+
+        <h4>@Catch() のバリエーション</h4>
+<pre><code>@Catch()                                        // 全例外を捕捉
+@Catch(HttpException)                            // HttpException とその子孫だけ
+@Catch(HttpException, ZodValidationException)    // 複数指定もOK</code></pre>
+
+        <h4>グローバル登録</h4>
+<pre><code>// main.ts で登録
+const app = await NestFactory.create(AppModule);
+app.useGlobalFilters(new GlobalExceptionFilter());
+// ↑ アプリ全体で1つの ExceptionFilter が全例外を捕捉</code></pre>
+
+        <h4>例外の種類ごとの処理フロー</h4>
+        <table>
+          <thead><tr><th>例外の種類</th><th>ステータスコード</th><th>例</th></tr></thead>
+          <tbody>
+            <tr><td><code>NotFoundException</code></td><td>404</td><td><code>throw new NotFoundException()</code></td></tr>
+            <tr><td><code>BadRequestException</code></td><td>400</td><td>Pipe のバリデーション失敗</td></tr>
+            <tr><td><code>ForbiddenException</code></td><td>403</td><td>Guard が false を返した場合</td></tr>
+            <tr><td><code>ZodValidationException</code></td><td>400</td><td>ZodValidationPipe の検証失敗</td></tr>
+            <tr><td>Prisma エラー</td><td>400 / 404 / 409 等</td><td>DB 操作の失敗（外部キー違反、一意制約違反）</td></tr>
+            <tr><td>想定外のエラー</td><td>500</td><td><code>HttpException</code> でないもの全て</td></tr>
+          </tbody>
+        </table>
+
+        <div class="note">
+          <strong>覚え方:</strong> Exception Filter は「<strong>全例外の受け皿</strong>」。どの層で爆発しても最終的にここで整形されてクライアントに返る。pick-cash では GlobalExceptionFilter が HTTP ステータスに応じた日本語メッセージを返す設計。
+        </div>
+      </div>
+    </details>
+
+    <!-- Q10 -->
+    <details class="qa">
+      <summary>判断フローチャート — やりたいことに応じてどの層を使うべきか？</summary>
+      <div class="qa-body">
+        <p>リクエストライフサイクルの各層（Middleware / Guard / Interceptor / Pipe / Exception Filter）のどれを使うべきかは、「やりたいこと」から逆引きできる。</p>
+
+        <h4>判断フローチャート</h4>
+        <div class="ascii-art">やりたいこと何？
+  │
+  ├→ 全リクエスト共通の前処理       → Middleware
+  │   （ログ、CORS、ヘッダー注入）
+  │   ※ どの Controller に行くか知らなくてもいい処理
+  │
+  ├→ 通すか弾くかの判定             → Guard
+  │   （認証、認可、ロール制御）
+  │   ※ true / false で判定するだけ
+  │   ※ メソッド単位で適用したい場合は Guard 一択
+  │
+  ├→ リクエスト/レスポンスの加工     → Interceptor
+  │   （ログ、キャッシュ、フォーマット統一）
+  │   ※ データを変形する必要がある場合
+  │   ※ Controller の前後で処理したい場合
+  │
+  ├→ パラメータの検証・変換          → Pipe
+  │   （バリデーション、型変換）
+  │   ※ Controller メソッドの引数に対して動く
+  │
+  └→ 例外の整形                     → Exception Filter
+      （エラーレスポンスの統一）
+      ※ どの層で例外が起きても最終的にここ</div>
+
+        <h4>よくある「どっち？」の迷いどころ</h4>
+        <table>
+          <thead><tr><th>やりたいこと</th><th>Middleware？</th><th>Guard？</th><th>理由</th></tr></thead>
+          <tbody>
+            <tr><td>JWT トークンを検証して req.userId を注入</td><td><span class="check">○</span></td><td></td><td>全リクエスト共通の前処理、ルート関係なく適用</td></tr>
+            <tr><td>admin ロールだけ許可するエンドポイント</td><td></td><td><span class="check">○</span></td><td>メソッド単位で制御、ExecutionContext が必要</td></tr>
+            <tr><td>全リクエストのログ出力（URL, メソッド）</td><td><span class="check">○</span></td><td></td><td>全リクエスト共通、ルート関係なし</td></tr>
+            <tr><td>レスポンスの処理時間をログ出力</td><td></td><td></td><td>→ <strong>Interceptor</strong>（前後で挟む必要がある）</td></tr>
+          </tbody>
+        </table>
+
+        <table>
+          <thead><tr><th>やりたいこと</th><th>Guard？</th><th>Interceptor？</th><th>理由</th></tr></thead>
+          <tbody>
+            <tr><td>リクエストを通すか弾くか判定</td><td><span class="check">○</span></td><td></td><td>Guard は yes/no の判定に特化</td></tr>
+            <tr><td>レスポンスを <code>{ data }</code> でラップ</td><td></td><td><span class="check">○</span></td><td>Interceptor はデータ加工が得意</td></tr>
+          </tbody>
+        </table>
+
+        <table>
+          <thead><tr><th>やりたいこと</th><th>Interceptor？</th><th>Pipe？</th><th>理由</th></tr></thead>
+          <tbody>
+            <tr><td>リクエストボディ全体をバリデーション</td><td></td><td><span class="check">○</span></td><td>Pipe はパラメータ単位の検証に特化</td></tr>
+            <tr><td>レスポンスの形式を変換</td><td><span class="check">○</span></td><td></td><td>Pipe はレスポンスには関与しない</td></tr>
+          </tbody>
+        </table>
+
+        <h4>このプロジェクトで既に使ってるもの</h4>
+        <table>
+          <thead><tr><th>層</th><th>実装</th><th>ファイル</th></tr></thead>
+          <tbody>
+            <tr><td>Middleware</td><td>AuthMiddleware</td><td><code>common/middlewares/auth.middleware.ts</code></td></tr>
+            <tr><td>Pipe</td><td>ZodValidationPipe</td><td>nestjs-zod がグローバル登録（main.ts）</td></tr>
+            <tr><td>Exception Filter</td><td>GlobalExceptionFilter</td><td><code>common/filters/globalException.filter.ts</code></td></tr>
+          </tbody>
+        </table>
+
+        <h4>まだ使ってないが案件で確実に出てくるもの</h4>
+        <table>
+          <thead><tr><th>層</th><th>案件でよくある用途</th></tr></thead>
+          <tbody>
+            <tr><td>Guard</td><td>ロールベースのアクセス制御（管理者 / 一般ユーザー）、IP制限、レートリミット</td></tr>
+            <tr><td>Interceptor</td><td>レスポンスの統一フォーマット化、リクエスト/レスポンスログ、タイムアウト制御、キャッシュ</td></tr>
+          </tbody>
+        </table>
+
+        <div class="note">
+          <strong>覚え方:</strong>
+          <ul>
+            <li><strong>Middleware</strong> = 全体に効く前処理（Express レイヤー）</li>
+            <li><strong>Guard</strong> = 通す/弾くの判定（NestJS レイヤー、メソッド単位で制御可能）</li>
+            <li><strong>Interceptor</strong> = データの加工（前後で挟む）</li>
+            <li><strong>Pipe</strong> = パラメータの検証・変換</li>
+            <li><strong>Exception Filter</strong> = 例外の整形（最後の砦）</li>
+          </ul>
+          <p>迷ったら「<strong>データを加工するか？</strong>」「<strong>通す/弾くだけか？</strong>」「<strong>パラメータ単位か？</strong>」の3つの質問で絞り込める。</p>
+        </div>
+      </div>
+    </details>
   </section>
 
   <!-- ============================================ -->
