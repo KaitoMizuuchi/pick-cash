@@ -1,6 +1,6 @@
-import { z } from "zod";
+import { z } from 'zod';
 
-export const transactionTypeSchema = z.enum(["income", "expense"]);
+export const transactionTypeSchema = z.enum(['income', 'expense']);
 export type TransactionType = z.infer<typeof transactionTypeSchema>;
 
 export const categorySchema = z.object({

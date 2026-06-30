@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { CategoriesRepository } from './categories.repository';
+import type { CategoriesRepository } from './categories.repository';
 import { CategoriesService } from './categories.service';
 
 // Repository をモックして Service 単体の振る舞い（引数の透過・戻り値の透過）だけを検証する。
